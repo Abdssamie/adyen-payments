@@ -23,32 +23,229 @@ import type { FunctionReference } from "convex/server";
  */
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
-    lib: {
-      add: FunctionReference<
+    private: {
+      insertCheckoutSession: FunctionReference<
         "mutation",
         "internal",
-        { targetId: string; text: string; userId: string },
+        {
+          amount: number;
+          currency: string;
+          merchantReference: string;
+          sessionData: string;
+          sessionId: string;
+          shopperReference?: string;
+          url?: string;
+        },
+        null,
+        Name
+      >;
+      recordPayment: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          amount: number;
+          currency: string;
+          merchantReference: string;
+          metadata?: any;
+          orgId?: string;
+          originalReference?: string;
+          paymentMethod?: string;
+          pspReference: string;
+          shopperReference?: string;
+          status: string;
+          userId?: string;
+        },
+        null,
+        Name
+      >;
+      syncPaymentMethods: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          paymentMethods: Array<{
+            cardExpiryMonth?: string;
+            cardExpiryYear?: string;
+            cardLast4?: string;
+            metadata?: any;
+            recurringDetailReference: string;
+            variant: string;
+          }>;
+          shopperReference: string;
+        },
+        null,
+        Name
+      >;
+      updatePaymentStatus: FunctionReference<
+        "mutation",
+        "internal",
+        { originalReference?: string; pspReference: string; status: string },
+        null,
+        Name
+      >;
+    };
+    public: {
+      createOrUpdateShopper: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          email?: string;
+          metadata?: any;
+          name?: string;
+          shopperReference: string;
+          userId?: string;
+        },
         string,
         Name
       >;
-      list: FunctionReference<
+      getCheckoutSession: FunctionReference<
         "query",
         "internal",
-        { limit?: number; targetId: string },
+        { sessionId: string },
+        {
+          amount: number;
+          currency: string;
+          merchantReference: string;
+          sessionData: string;
+          sessionId: string;
+          shopperReference?: string;
+          status: string;
+          url?: string;
+        } | null,
+        Name
+      >;
+      getPayment: FunctionReference<
+        "query",
+        "internal",
+        { pspReference: string },
+        {
+          amount: number;
+          created: number;
+          currency: string;
+          merchantReference: string;
+          metadata?: any;
+          orgId?: string;
+          originalReference?: string;
+          paymentMethod?: string;
+          pspReference: string;
+          shopperReference?: string;
+          status: string;
+          userId?: string;
+        } | null,
+        Name
+      >;
+      getShopper: FunctionReference<
+        "query",
+        "internal",
+        { shopperReference: string },
+        {
+          email?: string;
+          metadata?: any;
+          name?: string;
+          shopperReference: string;
+          userId?: string;
+        } | null,
+        Name
+      >;
+      getShopperByEmail: FunctionReference<
+        "query",
+        "internal",
+        { email: string },
+        {
+          email?: string;
+          metadata?: any;
+          name?: string;
+          shopperReference: string;
+          userId?: string;
+        } | null,
+        Name
+      >;
+      getShopperByUserId: FunctionReference<
+        "query",
+        "internal",
+        { userId: string },
+        {
+          email?: string;
+          metadata?: any;
+          name?: string;
+          shopperReference: string;
+          userId?: string;
+        } | null,
+        Name
+      >;
+      listPaymentMethods: FunctionReference<
+        "query",
+        "internal",
+        { shopperReference: string },
         Array<{
-          _creationTime: number;
-          _id: string;
-          targetId: string;
-          text: string;
-          userId: string;
+          cardExpiryMonth?: string;
+          cardExpiryYear?: string;
+          cardLast4?: string;
+          metadata?: any;
+          recurringDetailReference: string;
+          shopperReference: string;
+          status: string;
+          variant: string;
         }>,
         Name
       >;
-      translate: FunctionReference<
-        "action",
+      listPayments: FunctionReference<
+        "query",
         "internal",
-        { baseUrl: string; commentId: string },
-        string,
+        { shopperReference: string },
+        Array<{
+          amount: number;
+          created: number;
+          currency: string;
+          merchantReference: string;
+          metadata?: any;
+          orgId?: string;
+          originalReference?: string;
+          paymentMethod?: string;
+          pspReference: string;
+          shopperReference?: string;
+          status: string;
+          userId?: string;
+        }>,
+        Name
+      >;
+      listPaymentsByOrgId: FunctionReference<
+        "query",
+        "internal",
+        { orgId: string },
+        Array<{
+          amount: number;
+          created: number;
+          currency: string;
+          merchantReference: string;
+          metadata?: any;
+          orgId?: string;
+          originalReference?: string;
+          paymentMethod?: string;
+          pspReference: string;
+          shopperReference?: string;
+          status: string;
+          userId?: string;
+        }>,
+        Name
+      >;
+      listPaymentsByUserId: FunctionReference<
+        "query",
+        "internal",
+        { userId: string },
+        Array<{
+          amount: number;
+          created: number;
+          currency: string;
+          merchantReference: string;
+          metadata?: any;
+          orgId?: string;
+          originalReference?: string;
+          paymentMethod?: string;
+          pspReference: string;
+          shopperReference?: string;
+          status: string;
+          userId?: string;
+        }>,
         Name
       >;
     };

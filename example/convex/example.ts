@@ -1,58 +1,153 @@
-import { action, mutation, query } from "./_generated/server.js";
+"use node";
+
+import { action } from "./_generated/server.js";
 import { components } from "./_generated/api.js";
-import { exposeApi } from "@abdssamie/adyen-payments";
+import { AdyenPayments } from "@abdssamie/adyen-payments";
 import { v } from "convex/values";
-import { Auth } from "convex/server";
 
-// Environment variables aren't available in the component,
-// so we need to pass it in as an argument to the component when necessary.
-const BASE_URL = process.env.BASE_URL ?? "https://pirate.monkeyness.com";
+const adyenClient = new AdyenPayments(components.adyenPayments, {});
 
-export const addComment = mutation({
-  args: { text: v.string(), targetId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.runMutation(components.adyenPayments.lib.add, {
-      text: args.text,
-      targetId: args.targetId,
-      userId: await getAuthUserId(ctx),
-    });
-  },
-});
-
-export const listComments = query({
-  args: { targetId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.runQuery(components.adyenPayments.lib.list, {
-      targetId: args.targetId,
-    });
-  },
-});
-
-export const translateComment = action({
-  args: { commentId: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.runAction(components.adyenPayments.lib.translate, {
-      baseUrl: BASE_URL,
-      commentId: args.commentId,
-    });
-  },
-});
-
-// Here is an alternative way to use the component's methods directly by re-exporting
-// the component's API:
-export const { list, add, translate } = exposeApi(components.adyenPayments, {
-  auth: async (ctx, operation) => {
-    const userId = await getAuthUserId(ctx);
-    if (userId === null && operation.type !== "read") {
-      throw new Error("Unauthorized");
-    }
-    return userId;
-  },
-  baseUrl: BASE_URL,
-});
-
-// You can also register HTTP routes for the component. See http.ts for an example.
-
-async function getAuthUserId(ctx: { auth: Auth }) {
-  return (await ctx.auth.getUserIdentity())?.subject ?? "anonymous";
+// Helper to get app URL
+function getAppUrl(): string {
+  const url = process.env.APP_URL;
+  if (!url) {
+    throw new Error("APP_URL environment variable is not set.");
+  }
+  return url;
 }
+
+// 1. Get or create shopper
+export const getOrCreateShopper = action({
+  args: {
+    userId: v.optional(v.string()),
+    email: v.optional(v.string()),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const userId = args.userId ?? identity?.subject ?? "guest_shopper_1";
+    const email = args.email ?? identity?.email ?? (userId === "guest_shopper_1" ? "guest@example.com" : undefined);
+    const name = args.name ?? identity?.name ?? (userId === "guest_shopper_1" ? "Guest Shopper" : undefined);
+
+    return await adyenClient.getOrCreateShopper(ctx, {
+      userId,
+      email,
+      name,
+    });
+  },
+});
+
+// 2. Create checkout session
+export const createCheckout = action({
+  args: {
+    amount: v.number(),
+    currency: v.string(),
+    shopperReference: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const shopperReference = args.shopperReference ?? identity?.subject ?? "guest_shopper_1";
+
+    const shopperResult = await adyenClient.getOrCreateShopper(ctx, {
+      userId: shopperReference,
+      email: identity?.email ?? (shopperReference === "guest_shopper_1" ? "guest@example.com" : undefined),
+      name: identity?.name ?? (shopperReference === "guest_shopper_1" ? "Guest Shopper" : undefined),
+    });
+
+    return await adyenClient.createCheckoutSession(ctx, {
+      amount: args.amount,
+      currency: args.currency,
+      successUrl: `${getAppUrl()}/?success=true`,
+      cancelUrl: `${getAppUrl()}/?canceled=true`,
+      shopperReference: shopperResult.shopperReference,
+    });
+  },
+});
+
+// 3. Sync stored payment methods
+export const syncPaymentMethods = action({
+  args: {
+    shopperReference: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await adyenClient.listStoredPaymentMethods(ctx, {
+      shopperReference: args.shopperReference,
+    });
+  },
+});
+
+// 4. Delete stored payment method
+export const deletePaymentMethod = action({
+  args: {
+    shopperReference: v.string(),
+    recurringDetailReference: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await adyenClient.deleteStoredPaymentMethod(ctx, {
+      shopperReference: args.shopperReference,
+      recurringDetailReference: args.recurringDetailReference,
+    });
+  },
+});
+
+// 5. Charge stored card
+export const chargeCard = action({
+  args: {
+    shopperReference: v.string(),
+    recurringDetailReference: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await adyenClient.chargeStoredCard(ctx, {
+      shopperReference: args.shopperReference,
+      recurringDetailReference: args.recurringDetailReference,
+      amount: args.amount,
+      currency: args.currency,
+    });
+  },
+});
+
+// 6. Capture payment
+export const capture = action({
+  args: {
+    pspReference: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await adyenClient.capturePayment(ctx, {
+      pspReference: args.pspReference,
+      amount: args.amount,
+      currency: args.currency,
+    });
+  },
+});
+
+// 7. Refund payment
+export const refund = action({
+  args: {
+    pspReference: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await adyenClient.refundPayment(ctx, {
+      pspReference: args.pspReference,
+      amount: args.amount,
+      currency: args.currency,
+    });
+  },
+});
+
+// 8. Cancel payment
+export const cancel = action({
+  args: {
+    pspReference: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await adyenClient.cancelPayment(ctx, {
+      pspReference: args.pspReference,
+    });
+  },
+});

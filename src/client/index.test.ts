@@ -1,36 +1,106 @@
-import { describe, expect, test } from "vitest";
-import { exposeApi } from "./index.js";
-import { anyApi, type ApiFromModules } from "convex/server";
+import { describe, expect, test, vi, beforeEach } from "vitest";
+import { AdyenPayments } from "./index.js";
 import { components, initConvexTest } from "./setup.test.js";
 
-export const { add, list } = exposeApi(components.adyenPayments, {
-  auth: async (ctx, _operation) => {
-    return (await ctx.auth.getUserIdentity())?.subject ?? "anonymous";
-  },
-  baseUrl: "https://pirate.monkeyness.com",
+// Mock the Adyen SDK API calls
+vi.mock("@adyen/api-library", () => {
+  const sessionsMock = vi.fn().mockResolvedValue({
+    id: "sess_123",
+    sessionData: "data_blob_123",
+    url: "https://checkout.adyen.com/pay/123",
+  });
+
+  const paymentMethodsMock = vi.fn().mockResolvedValue({
+    storedPaymentMethods: [
+      { id: "token_123", brand: "visa", lastFour: "1111", expiryMonth: "12", expiryYear: "2030" }
+    ]
+  });
+
+  const deleteStoredPaymentMethodMock = vi.fn().mockResolvedValue({});
+
+  const paymentsMock = vi.fn().mockResolvedValue({
+    pspReference: "psp_123",
+    resultCode: "Authorised",
+    paymentMethod: { type: "visa" }
+  });
+
+  const captureMock = vi.fn().mockResolvedValue({ pspReference: "psp_cap_123", status: "received" });
+  const refundMock = vi.fn().mockResolvedValue({ pspReference: "psp_ref_123", status: "received" });
+  const cancelMock = vi.fn().mockResolvedValue({ pspReference: "psp_can_123", status: "received" });
+
+  class CheckoutAPIMock {
+    PaymentsApi = {
+      sessions: sessionsMock,
+      payments: paymentsMock,
+      paymentMethods: paymentMethodsMock,
+    };
+    RecurringApi = {
+      deleteTokenForStoredPaymentDetails: deleteStoredPaymentMethodMock,
+    };
+    ModificationsApi = {
+      captureAuthorisedPayment: captureMock,
+      refundCapturedPayment: refundMock,
+      cancelAuthorisedPaymentByPspReference: cancelMock,
+    };
+  }
+
+  return {
+    Client: vi.fn(),
+    CheckoutAPI: CheckoutAPIMock,
+  };
 });
 
-const testApi = (
-  anyApi as unknown as ApiFromModules<{
-    "index.test": {
-      add: typeof add;
-      list: typeof list;
-    };
-  }>
-)["index.test"];
+describe("AdyenPayments client class tests", () => {
+  beforeEach(() => {
+    process.env.ADYEN_API_KEY = "test_key";
+    process.env.ADYEN_MERCHANT_ACCOUNT = "test_merchant";
+  });
 
-describe("client tests", () => {
-  test("should be able to use client", async () => {
-    const t = initConvexTest().withIdentity({
-      subject: "user1",
+  test("constructor configuration", () => {
+    const client = new AdyenPayments(components.adyenPayments);
+    expect(client.apiKey).toBe("test_key");
+    expect(client.merchantAccount).toBe("test_merchant");
+    expect(client.environment).toBe("TEST");
+  });
+
+  test("shopper operations in client context", async () => {
+    const t = initConvexTest();
+    const payments = new AdyenPayments(components.adyenPayments);
+
+    const shopperRef = await payments.createShopper(t as any, {
+      shopperReference: "shopper_1",
+      email: "shopper1@example.com",
     });
-    const targetId = "test-subject-1";
-    await t.mutation(testApi.add, {
-      text: "My first comment",
-      targetId: targetId,
+    expect(shopperRef).toBe("shopper_1");
+  });
+
+  test("checkout session creation", async () => {
+    const t = initConvexTest();
+    const payments = new AdyenPayments(components.adyenPayments);
+
+    const session = await payments.createCheckoutSession(t as any, {
+      amount: 1500,
+      currency: "USD",
+      successUrl: "https://example.com/success",
+      cancelUrl: "https://example.com/cancel",
     });
-    const comments = await t.query(testApi.list, { targetId });
-    expect(comments).toHaveLength(1);
-    expect(comments[0].text).toBe("My first comment");
+
+    expect(session.sessionId).toBe("sess_123");
+    expect(session.url).toBe("https://checkout.adyen.com/pay/123");
+  });
+
+  test("charging stored payment method", async () => {
+    const t = initConvexTest();
+    const payments = new AdyenPayments(components.adyenPayments);
+
+    const chargeResult = await payments.chargeStoredCard(t as any, {
+      shopperReference: "shopper_1",
+      recurringDetailReference: "token_123",
+      amount: 5000,
+      currency: "EUR",
+    });
+
+    expect(chargeResult.pspReference).toBe("psp_123");
+    expect(chargeResult.status).toBe("authorised");
   });
 });

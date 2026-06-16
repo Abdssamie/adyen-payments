@@ -2,7 +2,6 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Shoppers mapped to application user IDs
   shoppers: defineTable({
     shopperReference: v.string(), // Unique key defined by the merchant (e.g. userId)
     email: v.optional(v.string()),

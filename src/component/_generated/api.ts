@@ -8,8 +8,8 @@
  * @module
  */
 
-import type * as http from "../http.js";
-import type * as lib from "../lib.js";
+import type * as private_ from "../private.js";
+import type * as public_ from "../public.js";
 
 import type {
   ApiFromModules,
@@ -19,8 +19,8 @@ import type {
 import { anyApi, componentsGeneric } from "convex/server";
 
 const fullApi: ApiFromModules<{
-  http: typeof http;
-  lib: typeof lib;
+  private: typeof private_;
+  public: typeof public_;
 }> = anyApi as any;
 
 /**

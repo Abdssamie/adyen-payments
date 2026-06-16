@@ -74,6 +74,7 @@
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@typescript/native-preview": "7.0.0-dev.20260614.1",
     "@vitejs/plugin-react": "^6.0.2",
     "chokidar-cli": "3.0.0",
     "convex": "^1.41.0",
@@ -91,6 +92,9 @@
     "typescript-eslint": "8.58.2",
     "vite": "8.0.9",
     "vitest": "4.1.4"
+  },
+  "dependencies": {
+    "@adyen/api-library": "^22.0.0"
   },
   "types": "./dist/client/index.d.ts",
   "module": "./dist/client/index.js"
