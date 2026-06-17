@@ -1,3 +1,5 @@
+"use node";
+
 import { httpRouter } from "convex/server";
 import { components } from "./_generated/api.js";
 import { registerRoutes } from "@abdssamie/adyen-payments";
