@@ -29,6 +29,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "internal",
         {
           amount: number;
+          autoCapture?: boolean;
           currency: string;
           merchantReference: string;
           sessionData: string;
@@ -90,6 +91,13 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         null,
         Name
       >;
+      updateCheckoutSessionStatus: FunctionReference<
+        "mutation",
+        "internal",
+        { merchantReference: string; status: string },
+        null,
+        Name
+      >;
       updatePaymentStatus: FunctionReference<
         "mutation",
         "internal",
@@ -118,6 +126,24 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         { sessionId: string },
         {
           amount: number;
+          autoCapture?: boolean;
+          currency: string;
+          merchantReference: string;
+          sessionData: string;
+          sessionId: string;
+          shopperReference?: string;
+          status: string;
+          url?: string;
+        } | null,
+        Name
+      >;
+      getCheckoutSessionByMerchantReference: FunctionReference<
+        "query",
+        "internal",
+        { merchantReference: string },
+        {
+          amount: number;
+          autoCapture?: boolean;
           currency: string;
           merchantReference: string;
           sessionData: string;

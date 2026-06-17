@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import App from "./App.jsx";
 import "./index.css";
+import "@adyen/adyen-web/styles/adyen.css";
 
 const address = import.meta.env.VITE_CONVEX_URL;
 

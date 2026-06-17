@@ -38,6 +38,19 @@ export interface AdyenPaymentsOptions {
   ADYEN_API_KEY?: string;
   ADYEN_MERCHANT_ACCOUNT?: string;
   ADYEN_ENVIRONMENT?: "TEST" | "LIVE";
+  /**
+   * Default delay in hours before capturing the payment.
+   * - `0` (default): Capture immediately (Auto-capture).
+   * - `-1`: Manual capture (must be captured via API later).
+   * - `N` (greater than 0): Capture automatically after N hours.
+   */
+  captureDelayHours?: number;
+  /**
+   * Whether to capture the payment automatically.
+   * If true (default), capture immediately.
+   * If false, perform manual capture (must be captured via API later).
+   */
+  autoCapture?: boolean;
 }
 
 /**
@@ -50,6 +63,7 @@ export class AdyenPayments {
   private _apiKey: string;
   private _merchantAccount: string;
   private _environment: "TEST" | "LIVE";
+  public captureDelayHours: number;
 
   constructor(
     public component: AdyenComponent,
@@ -60,6 +74,13 @@ export class AdyenPayments {
       options?.ADYEN_MERCHANT_ACCOUNT ?? process.env.ADYEN_MERCHANT_ACCOUNT!;
     const env = options?.ADYEN_ENVIRONMENT ?? process.env.ADYEN_ENVIRONMENT;
     this._environment = env === "LIVE" ? "LIVE" : "TEST";
+    if (options?.autoCapture === false) {
+      this.captureDelayHours = -1;
+    } else if (options?.autoCapture === true && options?.captureDelayHours === -1) {
+      this.captureDelayHours = 0;
+    } else {
+      this.captureDelayHours = options?.captureDelayHours ?? 0;
+    }
   }
 
   get apiKey(): string {
@@ -175,11 +196,24 @@ export class AdyenPayments {
       successUrl: string;
       cancelUrl: string;
       shopperReference?: string;
+      captureDelayHours?: number;
+      autoCapture?: boolean;
       metadata?: Record<string, string>;
     }
   ) {
     const checkout = this.getAdyenClient();
     const merchantReference = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    let captureDelayHours = args.captureDelayHours;
+    if (args.autoCapture === false) {
+      captureDelayHours = -1;
+    } else if (args.autoCapture === true) {
+      if (captureDelayHours === undefined || captureDelayHours === -1) {
+        captureDelayHours = 0;
+      }
+    } else if (captureDelayHours === undefined) {
+      captureDelayHours = this.captureDelayHours;
+    }
 
     const response = await checkout.PaymentsApi.sessions({
       amount: { value: args.amount, currency: args.currency },
@@ -187,6 +221,7 @@ export class AdyenPayments {
       merchantAccount: this.merchantAccount,
       returnUrl: args.successUrl,
       shopperReference: args.shopperReference,
+      captureDelayHours: captureDelayHours,
       // If shopper is logged in, enable saved payment methods and ask for consent
       ...(args.shopperReference && {
         storePaymentMethodMode: "askForConsent" as CreateCheckoutSessionRequest.StorePaymentMethodModeEnum,
@@ -203,6 +238,7 @@ export class AdyenPayments {
       amount: args.amount,
       currency: args.currency,
       url: response.url || undefined,
+      autoCapture: captureDelayHours === 0,
     });
 
     return {
@@ -298,6 +334,8 @@ export class AdyenPayments {
       currency: string;
       reference?: string;
       returnUrl?: string;
+      captureDelayHours?: number;
+      autoCapture?: boolean;
       metadata?: Record<string, unknown>;
     }
   ) {
@@ -312,6 +350,17 @@ export class AdyenPayments {
       );
     }
 
+    let captureDelayHours = args.captureDelayHours;
+    if (args.autoCapture === false) {
+      captureDelayHours = -1;
+    } else if (args.autoCapture === true) {
+      if (captureDelayHours === undefined || captureDelayHours === -1) {
+        captureDelayHours = 0;
+      }
+    } else if (captureDelayHours === undefined) {
+      captureDelayHours = this.captureDelayHours;
+    }
+
     const response = await checkout.PaymentsApi.payments({
       amount: { value: args.amount, currency: args.currency },
       reference: merchantReference,
@@ -324,11 +373,13 @@ export class AdyenPayments {
       } as CardDetails,
       shopperInteraction: "ContAuth" as PaymentRequest.ShopperInteractionEnum,
       recurringProcessingModel: "Subscription" as PaymentRequest.RecurringProcessingModelEnum,
+      captureDelayHours: captureDelayHours,
     });
 
+    const isAutoCapture = captureDelayHours === 0;
     const status =
       response.resultCode === "Authorised"
-        ? "authorised"
+        ? (isAutoCapture ? "captured" : "authorised")
         : response.resultCode?.toLowerCase() || "refused";
 
     // Record transaction
@@ -624,9 +675,27 @@ async function processNotification(
   const amountValue = item.amount?.value;
   const amountCurrency = item.amount?.currency;
 
+  let shopperReference = item.shopperReference;
+  let isAutoCapture = false;
+  if (merchantReference) {
+    const session = await ctx.runQuery(
+      component.public.getCheckoutSessionByMerchantReference,
+      { merchantReference }
+    );
+    if (session) {
+      if (session.shopperReference) {
+        shopperReference = session.shopperReference;
+      }
+      isAutoCapture = session.autoCapture ?? false;
+    }
+  }
+
   switch (eventCode) {
     case EventCodeEnum.Authorisation: {
-      const status = success ? "authorised" : "refused";
+      console.log("📥 AUTHORISATION webhook incoming payload:", JSON.stringify(item, null, 2));
+      const status = success
+        ? (isAutoCapture ? "captured" : "authorised")
+        : "refused";
 
       await ctx.runMutation(component.private.recordPayment, {
         pspReference,
@@ -636,8 +705,16 @@ async function processNotification(
         currency: amountCurrency ?? "unknown",
         status,
         paymentMethod: item.paymentMethod,
-        shopperReference: item.shopperReference,
+        shopperReference,
       });
+
+      if (merchantReference) {
+        const sessionStatus = success ? "completed" : "refused";
+        await ctx.runMutation(component.private.updateCheckoutSessionStatus, {
+          merchantReference,
+          status: sessionStatus,
+        });
+      }
 
       if (success && item.additionalData) {
         const recurringDetailReference = item.additionalData["recurring.recurringDetailReference"];
@@ -653,9 +730,9 @@ async function processNotification(
           cardExpiryYear = parts[1];
         }
 
-        if (recurringDetailReference && item.shopperReference) {
+        if (recurringDetailReference && shopperReference) {
           await ctx.runMutation(component.private.insertPaymentMethod, {
-            shopperReference: item.shopperReference,
+            shopperReference,
             recurringDetailReference,
             variant,
             cardLast4,
@@ -668,7 +745,7 @@ async function processNotification(
     }
 
     case EventCodeEnum.RecurringContract: {
-      if (success && item.additionalData && item.shopperReference) {
+      if (success && item.additionalData && shopperReference) {
         const recurringDetailReference = item.additionalData["recurring.recurringDetailReference"];
         const variant = item.additionalData["paymentMethod"] || item.paymentMethod || "scheme";
         const cardLast4 = item.additionalData["cardSummary"];
@@ -684,7 +761,7 @@ async function processNotification(
 
         if (recurringDetailReference) {
           await ctx.runMutation(component.private.insertPaymentMethod, {
-            shopperReference: item.shopperReference,
+            shopperReference,
             recurringDetailReference,
             variant,
             cardLast4,

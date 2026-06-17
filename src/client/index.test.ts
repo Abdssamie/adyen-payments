@@ -105,9 +105,92 @@ describe("AdyenPayments client class tests", () => {
       recurringDetailReference: "token_123",
       amount: 5000,
       currency: "EUR",
+      autoCapture: false,
     });
 
     expect(chargeResult.pspReference).toBe("psp_123");
     expect(chargeResult.status).toBe("authorised");
+  });
+
+  test("autoCapture and captureDelayHours configuration logic", async () => {
+    // 1. Default constructor options
+    const clientDefault = new AdyenPayments(components.adyenPayments);
+    expect(clientDefault.captureDelayHours).toBe(0);
+
+    // 2. autoCapture: false -> captureDelayHours = -1
+    const clientManual = new AdyenPayments(components.adyenPayments, { autoCapture: false });
+    expect(clientManual.captureDelayHours).toBe(-1);
+
+    // 3. autoCapture: true -> captureDelayHours = 0
+    const clientAuto = new AdyenPayments(components.adyenPayments, { autoCapture: true });
+    expect(clientAuto.captureDelayHours).toBe(0);
+
+    // 4. autoCapture: true and captureDelayHours: -1 -> captureDelayHours = 0 (resolved conflict)
+    const clientConflict1 = new AdyenPayments(components.adyenPayments, { autoCapture: true, captureDelayHours: -1 });
+    expect(clientConflict1.captureDelayHours).toBe(0);
+
+    // 5. autoCapture: true and captureDelayHours: 24 -> captureDelayHours = 24
+    const clientConflict2 = new AdyenPayments(components.adyenPayments, { autoCapture: true, captureDelayHours: 24 });
+    expect(clientConflict2.captureDelayHours).toBe(24);
+  });
+
+  test("createCheckoutSession and chargeStoredCard autoCapture parameters mapping", async () => {
+    const t = initConvexTest();
+    const payments = new AdyenPayments(components.adyenPayments, { autoCapture: false });
+
+    const { CheckoutAPI } = await import("@adyen/api-library");
+    const checkoutInstance = new CheckoutAPI(null as any);
+    const sessionsSpy = vi.mocked(checkoutInstance.PaymentsApi.sessions);
+    const paymentsSpy = vi.mocked(checkoutInstance.PaymentsApi.payments);
+
+    sessionsSpy.mockClear();
+    paymentsSpy.mockClear();
+
+    // 1. Client configured with autoCapture: false, method called without override
+    await payments.createCheckoutSession(t as unknown as ActionCtx, {
+      amount: 1500,
+      currency: "USD",
+      successUrl: "https://example.com/success",
+      cancelUrl: "https://example.com/cancel",
+    });
+    expect(sessionsSpy).toHaveBeenCalledWith(expect.objectContaining({
+      captureDelayHours: -1,
+    }));
+
+    // 2. Client configured with autoCapture: false, method called with override autoCapture: true
+    sessionsSpy.mockClear();
+    await payments.createCheckoutSession(t as unknown as ActionCtx, {
+      amount: 1500,
+      currency: "USD",
+      successUrl: "https://example.com/success",
+      cancelUrl: "https://example.com/cancel",
+      autoCapture: true,
+    });
+    expect(sessionsSpy).toHaveBeenCalledWith(expect.objectContaining({
+      captureDelayHours: 0,
+    }));
+
+    // 3. chargeStoredCard client default vs override
+    await payments.chargeStoredCard(t as unknown as ActionCtx, {
+      shopperReference: "shopper_1",
+      recurringDetailReference: "token_123",
+      amount: 5000,
+      currency: "EUR",
+    });
+    expect(paymentsSpy).toHaveBeenCalledWith(expect.objectContaining({
+      captureDelayHours: -1,
+    }));
+
+    paymentsSpy.mockClear();
+    await payments.chargeStoredCard(t as unknown as ActionCtx, {
+      shopperReference: "shopper_1",
+      recurringDetailReference: "token_123",
+      amount: 5000,
+      currency: "EUR",
+      autoCapture: true,
+    });
+    expect(paymentsSpy).toHaveBeenCalledWith(expect.objectContaining({
+      captureDelayHours: 0,
+    }));
   });
 });

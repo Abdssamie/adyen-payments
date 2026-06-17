@@ -208,3 +208,22 @@ export const createOrUpdateShopper = mutation({
     return args.shopperReference;
   },
 });
+
+/**
+ * Get a checkout session by its merchantReference.
+ */
+export const getCheckoutSessionByMerchantReference = query({
+  args: { merchantReference: v.string() },
+  returns: v.union(checkoutSessionValidator, v.null()),
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("checkout_sessions")
+      .withIndex("by_merchant_reference", (q) =>
+        q.eq("merchantReference", args.merchantReference)
+      )
+      .unique();
+    if (!session) return null;
+    const { _id, _creationTime, ...data } = session;
+    return data;
+  },
+});

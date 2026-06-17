@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as adyenWebhooks from "../adyenWebhooks.js";
 import type * as example from "../example.js";
+import type * as http from "../http.js";
 import type * as queries from "../queries.js";
 
 import type {
@@ -18,7 +20,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  adyenWebhooks: typeof adyenWebhooks;
   example: typeof example;
+  http: typeof http;
   queries: typeof queries;
 }>;
 

@@ -1,18 +1,34 @@
 import { httpRouter } from "convex/server";
-import { webhookHandler } from "./adyenWebhooks.js";
+import { httpAction } from "./_generated/server.js";
+import { internal } from "./_generated/api.js";
 
 const http = httpRouter();
 
 /**
  * Register the Adyen webhook endpoint.
- * The handler lives in adyenWebhooks.ts ("use node") because it uses
- * @adyen/api-library which requires Node built-ins (crypto/assert/events).
+ * The handler logic is executed inside a Node.js action to support the
+ * @adyen/api-library, which depends on Node.js built-ins.
  * Webhook URL: https://<deployment>.convex.site/adyen/webhooks
  */
 http.route({
   path: "/adyen/webhooks",
   method: "POST",
-  handler: webhookHandler,
+  handler: httpAction(async (ctx, request) => {
+    const bodyText = await request.text();
+    try {
+      const responseText = await ctx.runAction(
+        internal.adyenWebhooks.handleWebhook,
+        { bodyText }
+      );
+      return new Response(responseText, {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      });
+    } catch (err) {
+      console.error("❌ Adyen Webhook Error:", err);
+      return new Response("Webhook Error", { status: 400 });
+    }
+  }),
 });
 
 export default http;

@@ -58,6 +58,7 @@ export default defineSchema({
     amount: v.number(),
     currency: v.string(),
     url: v.optional(v.string()), // Hosted Checkout URL (if applicable)
+    autoCapture: v.optional(v.boolean()),
   })
     .index("by_session_id", ["sessionId"])
     .index("by_shopper_reference", ["shopperReference"])

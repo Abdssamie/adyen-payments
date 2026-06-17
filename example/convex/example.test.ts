@@ -97,6 +97,7 @@ describe("example app tests", () => {
       recurringDetailReference: "token_123",
       amount: 1000,
       currency: "EUR",
+      autoCapture: false,
     });
     expect(payment.pspReference).toBe("psp_123");
     expect(payment.status).toBe("authorised");

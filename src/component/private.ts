@@ -13,6 +13,7 @@ export const insertCheckoutSession = mutation({
     amount: v.number(),
     currency: v.string(),
     url: v.optional(v.string()),
+    autoCapture: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -31,6 +32,7 @@ export const insertCheckoutSession = mutation({
         amount: args.amount,
         currency: args.currency,
         url: args.url,
+        autoCapture: args.autoCapture,
       });
     }
     return null;
@@ -245,6 +247,30 @@ export const syncPaymentMethods = mutation({
           metadata: method.metadata,
         });
       }
+    }
+    return null;
+  },
+});
+
+/**
+ * Update the status of a checkout session.
+ */
+export const updateCheckoutSessionStatus = mutation({
+  args: {
+    merchantReference: v.string(),
+    status: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("checkout_sessions")
+      .withIndex("by_merchant_reference", (q) =>
+        q.eq("merchantReference", args.merchantReference)
+      )
+      .unique();
+
+    if (session) {
+      await ctx.db.patch(session._id, { status: args.status });
     }
     return null;
   },

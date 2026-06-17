@@ -5,7 +5,9 @@ import { components } from "./_generated/api.js";
 import { AdyenPayments } from "@abdssamie/adyen-payments";
 import { v } from "convex/values";
 
-const adyenClient = new AdyenPayments(components.adyenPayments, {});
+const adyenClient = new AdyenPayments(components.adyenPayments, {
+  autoCapture: true,
+});
 
 // Helper to get app URL
 function getAppUrl(): string {
@@ -43,6 +45,7 @@ export const createCheckout = action({
     amount: v.number(),
     currency: v.string(),
     shopperReference: v.optional(v.string()),
+    autoCapture: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -60,6 +63,7 @@ export const createCheckout = action({
       successUrl: `${getAppUrl()}/?success=true`,
       cancelUrl: `${getAppUrl()}/?canceled=true`,
       shopperReference: shopperResult.shopperReference,
+      autoCapture: args.autoCapture,
     });
   },
 });
@@ -97,6 +101,7 @@ export const chargeCard = action({
     recurringDetailReference: v.string(),
     amount: v.number(),
     currency: v.string(),
+    autoCapture: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     return await adyenClient.chargeStoredCard(ctx, {
@@ -104,6 +109,7 @@ export const chargeCard = action({
       recurringDetailReference: args.recurringDetailReference,
       amount: args.amount,
       currency: args.currency,
+      autoCapture: args.autoCapture,
     });
   },
 });

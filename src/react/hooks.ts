@@ -377,6 +377,8 @@ export interface UseAdyenDropinOptions {
   sessionData: string | null;
   /** Environment: "TEST" or "LIVE" */
   environment?: "test" | "live";
+  /** Shopper country code (e.g. "US", "NL") — required by some payment methods */
+  countryCode?: string;
   /** Callback when Adyen reports payment completion */
   onPaymentCompleted?: (result: { resultCode: string }) => void;
   /** Callback when Adyen reports an error */
@@ -405,6 +407,7 @@ export function useAdyenDropin({
   sessionId,
   sessionData,
   environment = "test",
+  countryCode,
   onPaymentCompleted,
   onError,
 }: UseAdyenDropinOptions): UseAdyenDropinResult {
@@ -412,6 +415,13 @@ export function useAdyenDropin({
   const dropinRef = useRef<{ unmount?: () => void } | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [mountError, setMountError] = useState<string | null>(null);
+  const onPaymentCompletedRef = useRef(onPaymentCompleted);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onPaymentCompletedRef.current = onPaymentCompleted;
+    onErrorRef.current = onError;
+  });
 
   useEffect(() => {
     if (!sessionId || !sessionData || !containerRef.current || !clientKey) {
@@ -423,7 +433,7 @@ export function useAdyenDropin({
     const mountDropin = async () => {
       try {
         // Dynamically import to avoid SSR issues and keep bundle lean
-        const { AdyenCheckout, Dropin } = await import("@adyen/adyen-web");
+        const { AdyenCheckout, Dropin, Card } = await import("@adyen/adyen-web");
 
         if (cancelled || !containerRef.current) return;
 
@@ -435,19 +445,22 @@ export function useAdyenDropin({
         const checkout = await AdyenCheckout({
           environment,
           clientKey,
+          countryCode,
           session: { id: sessionId, sessionData },
           onPaymentCompleted: (result: { resultCode: string }) => {
-            if (!cancelled) onPaymentCompleted?.(result);
+            if (!cancelled) onPaymentCompletedRef.current?.(result);
           },
           onError: (err: { name: string; message: string }) => {
-            if (!cancelled) onError?.(err);
+            if (!cancelled) onErrorRef.current?.(err);
           },
         });
 
         if (cancelled || !containerRef.current) return;
 
         // v6 API: instantiate Dropin with the Core instance, then mount
-        const dropin = new Dropin(checkout).mount(containerRef.current);
+        const dropin = new Dropin(checkout, {
+          paymentMethodComponents: [Card],
+        }).mount(containerRef.current);
         dropinRef.current = dropin as { unmount?: () => void };
         if (!cancelled) setIsReady(true);
       } catch (err: unknown) {
@@ -469,7 +482,7 @@ export function useAdyenDropin({
         dropinRef.current = null;
       }
     };
-  }, [clientKey, sessionId, sessionData, environment, onPaymentCompleted, onError]);
+  }, [clientKey, sessionId, sessionData, environment, countryCode]);
 
   return { containerRef, isReady, mountError };
 }

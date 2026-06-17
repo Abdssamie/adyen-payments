@@ -168,11 +168,21 @@ function CheckoutPanel({
 
   const clientKey = import.meta.env.VITE_ADYEN_CLIENT_KEY as string | undefined;
 
+  const getCountryCode = (curr: string) => {
+    switch (curr) {
+      case "USD": return "US";
+      case "GBP": return "GB";
+      case "EUR":
+      default: return "NL";
+    }
+  };
+
   const { containerRef, mountError } = useAdyenDropin({
     clientKey: clientKey ?? "",
     sessionId: session?.sessionId ?? null,
     sessionData: session?.sessionData ?? null,
     environment: "test",
+    countryCode: getCountryCode(currency),
     onPaymentCompleted: (result: { resultCode: string }) => setPaymentResult(result.resultCode),
     onError: (err: { name: string; message: string }) => setPaymentResult(`Error: ${err.message}`),
   });
