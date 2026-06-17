@@ -94,6 +94,7 @@
     "vitest": "4.1.4"
   },
   "dependencies": {
+    "@adyen/adyen-web": "^6.39.0",
     "@adyen/api-library": "^22.0.0"
   },
   "types": "./dist/client/index.d.ts",

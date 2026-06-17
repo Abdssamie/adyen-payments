@@ -1,751 +1,619 @@
-import { useAction, useQuery } from "convex/react";
-import { api, components } from "../convex/_generated/api";
+import { api } from "../convex/_generated/api";
 import { useState } from "react";
+import {
+  useAdyenShopper,
+  useStoredPaymentMethods,
+  usePayments,
+  usePaymentOperations,
+  useAdyenDropin,
+} from "../../src/react/hooks.js";
+import type { AdyenHooksConfig, StoredCard, PaymentTransaction } from "../../src/react/hooks.js";
 
-interface SessionResult {
-  sessionId: string;
-  sessionData: string;
-  url: string | null;
-  merchantReference: string;
+// ---------------------------------------------------------------------------
+// Convex API config for hooks
+// ---------------------------------------------------------------------------
+const hooksConfig: AdyenHooksConfig = {
+  queries: {
+    getShopper:          api.queries.getShopper,
+    listPaymentMethods:  api.queries.listPaymentMethods,
+    listPayments:        api.queries.listPayments,
+    getPayment:          api.queries.listPayments, // proxy — unused by hooks directly
+  },
+  actions: {
+    getOrCreateShopper:  api.example.getOrCreateShopper,
+    createCheckout:      api.example.createCheckout,
+    syncPaymentMethods:  api.example.syncPaymentMethods,
+    deletePaymentMethod: api.example.deletePaymentMethod,
+    chargeCard:          api.example.chargeCard,
+    capture:             api.example.capture,
+    refund:              api.example.refund,
+    cancel:              api.example.cancel,
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
+function fmtCurrency(amount: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount / 100);
 }
 
-interface StoredCard {
-  shopperReference: string;
-  recurringDetailReference: string;
-  variant: string;
-  cardLast4?: string;
-  cardExpiryMonth?: string;
-  cardExpiryYear?: string;
-  status: string;
-  metadata?: any;
-}
-
-interface PaymentTransaction {
-  pspReference: string;
-  originalReference?: string;
-  shopperReference?: string;
-  merchantReference: string;
-  amount: number;
-  currency: string;
-  status: string;
-  paymentMethod?: string;
-  created: number;
-  userId?: string;
-  orgId?: string;
-  metadata?: any;
-}
-
-function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount / 100);
-}
-
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+function fmtDate(ts: number): string {
+  return new Date(ts).toLocaleString("en-US", {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }
 
-export default function App() {
-  const [shopperReference, setShopperReference] = useState<string>("guest_shopper_1");
-  const [shopperEmail, setShopperEmail] = useState<string>("guest@example.com");
-  const [shopperName, setShopperName] = useState<string>("Guest Shopper");
+const STATUS_BADGE: Record<string, string> = {
+  authorised:    "badge-green",
+  captured:      "badge-green",
+  refunded:      "badge-blue",
+  cancelled:     "badge-red",
+  refused:       "badge-red",
+  capture_failed:"badge-red",
+  refund_failed: "badge-red",
+  cancel_failed: "badge-red",
+};
 
-  const [checkoutAmount, setCheckoutAmount] = useState<number>(5000); // $50.00
-  const [checkoutCurrency, setCheckoutCurrency] = useState<string>("USD");
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
-  const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
-  const [loading, setLoading] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+/** Spinner button */
+function Btn({
+  onClick, disabled, className = "btn btn-primary", loading, children, style,
+}: {
+  onClick?: () => void; disabled?: boolean; className?: string;
+  loading?: boolean; children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <button className={className} onClick={onClick} disabled={disabled || loading} style={style}>
+      {loading && <span className="spinner" />}
+      {children}
+    </button>
+  );
+}
 
-  // Actions
-  const getOrCreateShopperAction = useAction(api.example.getOrCreateShopper);
-  const createCheckoutAction = useAction(api.example.createCheckout);
-  const listStoredPaymentMethodsAction = useAction(api.example.syncPaymentMethods);
-  const deleteStoredPaymentMethodAction = useAction(api.example.deletePaymentMethod);
-  const chargeCardAction = useAction(api.example.chargeCard);
-  const capturePaymentAction = useAction(api.example.capture);
-  const refundPaymentAction = useAction(api.example.refund);
-  const cancelPaymentAction = useAction(api.example.cancel);
+/** Shopper setup panel */
+function ShopperPanel({
+  shopperRef, setShopperRef, email, setEmail, name, setName, config,
+}: {
+  shopperRef: string; setShopperRef: (v: string) => void;
+  email: string; setEmail: (v: string) => void;
+  name: string; setName: (v: string) => void;
+  config: AdyenHooksConfig;
+}) {
+  const { shopper, isLoading, register } = useAdyenShopper({
+    shopperReference: shopperRef,
+    config,
+  });
 
-  // Queries
-  const shopper = useQuery(api.queries.getShopper, { shopperReference });
-  const paymentMethods = (useQuery(api.queries.listPaymentMethods, { shopperReference }) || []) as StoredCard[];
-  const payments = (useQuery(api.queries.listPayments, { shopperReference }) || []) as PaymentTransaction[];
+  const handleRegister = () =>
+    register({ userId: shopperRef, email, name }).catch(() => undefined);
 
-  const handleRegisterShopper = async () => {
-    setLoading("shopper");
-    setErrorMsg(null);
-    try {
-      await getOrCreateShopperAction({
-        userId: shopperReference,
-        email: shopperEmail,
-        name: shopperName,
-      });
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMsg(error.message || "Failed to create shopper");
-    } finally {
-      setLoading(null);
-    }
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">
+          <span className="card-icon">👤</span>
+          Shopper Identity
+        </span>
+        {shopper
+          ? <span className="badge badge-green pulse-dot">Active</span>
+          : <span className="badge badge-amber">Not synced</span>}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <div className="field">
+          <label className="field-label">Shopper Reference</label>
+          <input className="input" value={shopperRef}
+            onChange={(e) => setShopperRef(e.target.value)}
+            placeholder="user_abc123" />
+          <span className="field-hint">Unique identifier used in all Adyen calls</span>
+        </div>
+        <div className="field">
+          <label className="field-label">Email</label>
+          <input className="input" type="email" value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="shopper@example.com" />
+        </div>
+        <div className="field">
+          <label className="field-label">Display Name</label>
+          <input className="input" value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Jane Doe" />
+        </div>
+      </div>
+
+      <div style={{ marginTop: "1.25rem" }}>
+        <Btn
+          className="btn btn-primary btn-full"
+          loading={isLoading}
+          onClick={handleRegister}
+        >
+          {shopper ? "Update Shopper" : "Register Shopper"}
+        </Btn>
+        {shopper && (
+          <div className="shopper-status">
+            <span className="badge badge-green pulse-dot">Connected</span>
+            <strong>ID:</strong>
+            <span className="mono">{shopperRef}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Checkout + Drop-in panel */
+function CheckoutPanel({
+  shopperRef, config,
+}: { shopperRef: string; config: AdyenHooksConfig }) {
+  const [amount, setAmount]     = useState(5000);
+  const [currency, setCurrency] = useState("EUR");
+  const [tab, setTab]           = useState<"dropin" | "link">("dropin");
+  const [session, setSession]   = useState<{
+    sessionId: string; sessionData: string; url: string | null;
+  } | null>(null);
+  const [paymentResult, setPaymentResult] = useState<string | null>(null);
+
+  const ops = usePaymentOperations(config);
+
+  const handleCreateSession = async () => {
+    const result = await ops.createCheckoutSession({ amount, currency, shopperReference: shopperRef });
+    setSession(result);
+    setPaymentResult(null);
   };
 
-  const handleCreateCheckout = async () => {
-    setLoading("checkout");
-    setErrorMsg(null);
-    try {
-      const result = await createCheckoutAction({
-        amount: checkoutAmount,
-        currency: checkoutCurrency,
-        shopperReference,
-      });
-      setSessionResult(result as SessionResult);
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMsg(error.message || "Failed to create checkout session");
-    } finally {
-      setLoading(null);
-    }
-  };
+  const clientKey = import.meta.env.VITE_ADYEN_CLIENT_KEY as string | undefined;
 
-  const handleSyncPaymentMethods = async () => {
-    setLoading("sync-cards");
-    setErrorMsg(null);
-    try {
-      await listStoredPaymentMethodsAction({ shopperReference });
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMsg(error.message || "Failed to sync payment methods");
-    } finally {
-      setLoading(null);
-    }
-  };
+  const { containerRef, mountError } = useAdyenDropin({
+    clientKey: clientKey ?? "",
+    sessionId: session?.sessionId ?? null,
+    sessionData: session?.sessionData ?? null,
+    environment: "test",
+    onPaymentCompleted: (result: { resultCode: string }) => setPaymentResult(result.resultCode),
+    onError: (err: { name: string; message: string }) => setPaymentResult(`Error: ${err.message}`),
+  });
 
-  const handleDeleteCard = async (recurringDetailReference: string) => {
-    if (!confirm("Are you sure you want to delete this tokenized card?")) return;
-    setLoading(`delete-${recurringDetailReference}`);
-    setErrorMsg(null);
-    try {
-      await deleteStoredPaymentMethodAction({
-        shopperReference,
-        recurringDetailReference,
-      });
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMsg(error.message || "Failed to delete payment method");
-    } finally {
-      setLoading(null);
-    }
-  };
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">
+          <span className="card-icon">🛒</span>
+          Checkout Session
+        </span>
+        {session && <span className="badge badge-accent">Session active</span>}
+      </div>
 
-  const handleChargeCard = async (recurringDetailReference: string) => {
-    setLoading(`charge-${recurringDetailReference}`);
-    setErrorMsg(null);
-    try {
-      const response = await chargeCardAction({
-        shopperReference,
-        recurringDetailReference,
-        amount: 1500, // charge $15.00
-        currency: "USD",
-      });
-      alert(`Charge Result: ${response.resultCode} (PSP: ${response.pspReference})`);
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMsg(error.message || "Failed to charge card");
-    } finally {
-      setLoading(null);
-    }
-  };
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <div className="field">
+          <label className="field-label">Amount (minor units)</label>
+          <input className="input" type="number" value={amount}
+            onChange={(e) => setAmount(parseInt(e.target.value) || 0)} />
+          <span className="amount-display">{fmtCurrency(amount, currency)}</span>
+        </div>
+        <div className="field">
+          <label className="field-label">Currency</label>
+          <select className="select" value={currency}
+            onChange={(e) => setCurrency(e.target.value)}>
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+            <option value="GBP">GBP (£)</option>
+          </select>
+        </div>
+      </div>
 
-  const handleCapture = async (pspReference: string, amount: number, currency: string) => {
-    setLoading(`capture-${pspReference}`);
-    setErrorMsg(null);
-    try {
-      await capturePaymentAction({ pspReference, amount, currency });
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMsg(error.message || "Failed to capture payment");
-    } finally {
-      setLoading(null);
-    }
-  };
+      <Btn
+        className="btn btn-primary btn-full"
+        style={{ marginTop: "1.25rem" }}
+        loading={ops.isLoading("checkout")}
+        onClick={handleCreateSession}
+      >
+        {session ? "New Session" : "Create Checkout Session"}
+      </Btn>
 
-  const handleRefund = async (pspReference: string, amount: number, currency: string) => {
-    setLoading(`refund-${pspReference}`);
-    setErrorMsg(null);
-    try {
-      await refundPaymentAction({ pspReference, amount, currency });
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMsg(error.message || "Failed to refund payment");
-    } finally {
-      setLoading(null);
-    }
-  };
+      {paymentResult && (
+        <div className={`success-banner`} style={{ marginTop: "1rem", marginBottom: 0 }}>
+          <span>🎉</span>
+          <span>Payment result: <strong>{paymentResult}</strong></span>
+        </div>
+      )}
 
-  const handleCancel = async (pspReference: string) => {
-    setLoading(`cancel-${pspReference}`);
-    setErrorMsg(null);
-    try {
-      await cancelPaymentAction({ pspReference });
-    } catch (err: unknown) {
-      const error = err as Error;
-      setErrorMsg(error.message || "Failed to cancel payment");
-    } finally {
-      setLoading(null);
+      {session && (
+        <>
+          <div className="tabs" style={{ marginTop: "1.25rem", marginBottom: 0 }}>
+            <button className={`tab ${tab === "dropin" ? "active" : ""}`}
+              onClick={() => setTab("dropin")}>
+              Adyen Drop-in
+            </button>
+            <button className={`tab ${tab === "link" ? "active" : ""}`}
+              onClick={() => setTab("link")}>
+              Redirect Link
+            </button>
+          </div>
+
+          {tab === "dropin" ? (
+            clientKey ? (
+              mountError ? (
+                <div className="error-banner" style={{ marginTop: "1rem" }}>
+                  ⚠ Drop-in mount error: {mountError}
+                </div>
+              ) : (
+                <div className="adyen-dropin-wrapper">
+                  <div ref={containerRef} id="adyen-dropin-container" />
+                </div>
+              )
+            ) : (
+              <div className="tips-box" style={{ marginTop: "1rem" }}>
+                <strong>VITE_ADYEN_CLIENT_KEY not set.</strong><br />
+                Add it to your <code>.env.local</code> to enable the embedded Drop-in component.<br />
+                Alternatively, use the "Redirect Link" tab to pay via Adyen's hosted page.
+              </div>
+            )
+          ) : (
+            <div style={{ marginTop: "1rem" }}>
+              {session.url ? (
+                <a
+                  href={session.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-success btn-full"
+                  style={{ display: "flex" }}
+                >
+                  Open Adyen Hosted Checkout →
+                </a>
+              ) : (
+                <div className="empty-state">
+                  <p>No redirect URL returned for this session.</p>
+                </div>
+              )}
+              <div className="tips-box">
+                <strong>Session ID:</strong>
+                <br />
+                <code className="mono">{session.sessionId}</code>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {!session && (
+        <div className="dropin-placeholder">
+          <div className="dropin-placeholder-icon">💳</div>
+          <p>Create a checkout session to embed the Adyen Drop-in payment form or get a hosted redirect link.</p>
+        </div>
+      )}
+
+      {!clientKey && !session && (
+        <div className="tips-box">
+          <strong>Test cards:</strong>
+          <ul>
+            <li>Visa (success): <code>4111 1111 1111 1111</code></li>
+            <li>Mastercard: <code>5500 0000 0000 0004</code></li>
+            <li>3DS2 trigger: <code>4917 6100 0000 0000</code></li>
+            <li>Expiry: any future date — CVV: <code>737</code></li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Stored payment methods section */
+function StoredCardsSection({
+  shopperRef, config, ops,
+}: {
+  shopperRef: string;
+  config: AdyenHooksConfig;
+  ops: ReturnType<typeof usePaymentOperations>;
+}) {
+  const { paymentMethods, isSyncing, sync, remove } = useStoredPaymentMethods({
+    shopperReference: shopperRef,
+    config,
+  });
+
+  const [chargeAmount, setChargeAmount]     = useState(1500);
+  const [chargeCurrency, setChargeCurrency] = useState("EUR");
+
+  const handleCharge = async (ref: string) => {
+    const result = await ops.chargeCard({
+      shopperReference: shopperRef,
+      recurringDetailReference: ref,
+      amount: chargeAmount,
+      currency: chargeCurrency,
+    }).catch(() => null);
+    if (result) {
+      alert(`Result: ${result.resultCode}\nPSP: ${result.pspReference ?? "—"}`);
     }
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      backgroundColor: "#0F0F11",
-      color: "#E2E2E9",
-      fontFamily: "Inter, system-ui, sans-serif",
-      padding: "2rem 1.5rem"
-    }}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        
-        {/* Header */}
-        <header style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          borderBottom: "1px solid #27272A",
-          paddingBottom: "1.5rem",
-          marginBottom: "2rem"
-        }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: "1.8rem", fontWeight: 700, color: "#FFFFFF" }}>
-              Adyen Payments Component
-            </h1>
-            <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.9rem", color: "#A1A1AA" }}>
-              Convex Sandbox & Operation Dashboard
-            </p>
-          </div>
-          <div style={{
-            backgroundColor: "#1C1C1E",
-            border: "1px solid #2C2C2E",
-            padding: "0.5rem 1rem",
-            borderRadius: "6px",
-            fontSize: "0.85rem",
-            fontWeight: 500,
-            color: "#0ABF53"
-          }}>
-            ● Connected to Convex
-          </div>
-        </header>
+    <>
+      <div className="section-divider">
+        <h2>💳 Stored Payment Methods</h2>
+      </div>
 
-        {/* Error alert */}
-        {errorMsg && (
-          <div style={{
-            backgroundColor: "rgba(239, 68, 68, 0.15)",
-            border: "1px solid rgba(239, 68, 68, 0.3)",
-            color: "#EF4444",
-            padding: "1rem",
-            borderRadius: "8px",
-            marginBottom: "2rem",
-            fontSize: "0.9rem"
-          }}>
-            <strong>Error:</strong> {errorMsg}
-          </div>
-        )}
-
-        {/* Dashboard Grid */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
-          gap: "1.5rem",
-          marginBottom: "2rem"
-        }}>
-
-          {/* Shopper Card */}
-          <div style={{
-            backgroundColor: "#18181B",
-            border: "1px solid #27272A",
-            borderRadius: "12px",
-            padding: "1.5rem",
-            display: "flex",
-            flexDirection: "column"
-          }}>
-            <h3 style={{ margin: "0 0 1rem 0", color: "#FFFFFF", fontSize: "1.1rem" }}>👤 Shopper Session</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", flexGrow: 1 }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "#A1A1AA", marginBottom: "0.25rem" }}>Shopper Reference / ID</label>
-                <input
-                  type="text"
-                  value={shopperReference}
-                  onChange={(e) => setShopperReference(e.target.value)}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    backgroundColor: "#0F0F11",
-                    border: "1px solid #27272A",
-                    borderRadius: "6px",
-                    padding: "0.5rem",
-                    color: "#FFFFFF",
-                    fontSize: "0.9rem"
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "#A1A1AA", marginBottom: "0.25rem" }}>Email</label>
-                <input
-                  type="email"
-                  value={shopperEmail}
-                  onChange={(e) => setShopperEmail(e.target.value)}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    backgroundColor: "#0F0F11",
-                    border: "1px solid #27272A",
-                    borderRadius: "6px",
-                    padding: "0.5rem",
-                    color: "#FFFFFF",
-                    fontSize: "0.9rem"
-                  }}
-                />
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "#A1A1AA", marginBottom: "0.25rem" }}>Full Name</label>
-                <input
-                  type="text"
-                  value={shopperName}
-                  onChange={(e) => setShopperName(e.target.value)}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    backgroundColor: "#0F0F11",
-                    border: "1px solid #27272A",
-                    borderRadius: "6px",
-                    padding: "0.5rem",
-                    color: "#FFFFFF",
-                    fontSize: "0.9rem"
-                  }}
-                />
-              </div>
-            </div>
-            <div style={{ marginTop: "1.5rem" }}>
-              <button
-                onClick={handleRegisterShopper}
-                disabled={loading === "shopper"}
-                style={{
-                  width: "100%",
-                  backgroundColor: loading === "shopper" ? "#27272A" : "#0ABF53",
-                  color: "#FFFFFF",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "0.6rem",
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  cursor: loading === "shopper" ? "not-allowed" : "pointer"
-                }}
-              >
-                {loading === "shopper" ? "Registering..." : "Sync / Register Shopper"}
-              </button>
-              <div style={{ marginTop: "0.75rem", fontSize: "0.8rem", color: "#A1A1AA" }}>
-                Status: {shopper ? (
-                  <span style={{ color: "#0ABF53" }}>Registered (ID: {shopper.shopperReference})</span>
-                ) : (
-                  <span style={{ color: "#F59E0B" }}>Not synced in DB</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Checkout Card */}
-          <div style={{
-            backgroundColor: "#18181B",
-            border: "1px solid #27272A",
-            borderRadius: "12px",
-            padding: "1.5rem",
-            display: "flex",
-            flexDirection: "column"
-          }}>
-            <h3 style={{ margin: "0 0 1rem 0", color: "#FFFFFF", fontSize: "1.1rem" }}>🛍️ Initialize Checkout</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", flexGrow: 1 }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "#A1A1AA", marginBottom: "0.25rem" }}>Amount (in Cents/Minor units)</label>
-                <input
-                  type="number"
-                  value={checkoutAmount}
-                  onChange={(e) => setCheckoutAmount(parseInt(e.target.value) || 0)}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    backgroundColor: "#0F0F11",
-                    border: "1px solid #27272A",
-                    borderRadius: "6px",
-                    padding: "0.5rem",
-                    color: "#FFFFFF",
-                    fontSize: "0.9rem"
-                  }}
-                />
-                <span style={{ fontSize: "0.75rem", color: "#A1A1AA", marginTop: "0.25rem", display: "inline-block" }}>
-                  = {formatCurrency(checkoutAmount, checkoutCurrency)}
-                </span>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: "0.75rem", color: "#A1A1AA", marginBottom: "0.25rem" }}>Currency</label>
-                <select
-                  value={checkoutCurrency}
-                  onChange={(e) => setCheckoutCurrency(e.target.value)}
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    backgroundColor: "#0F0F11",
-                    border: "1px solid #27272A",
-                    borderRadius: "6px",
-                    padding: "0.5rem",
-                    color: "#FFFFFF",
-                    fontSize: "0.9rem"
-                  }}
-                >
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                </select>
-              </div>
-            </div>
-            <div style={{ marginTop: "1.5rem" }}>
-              <button
-                onClick={handleCreateCheckout}
-                disabled={loading === "checkout"}
-                style={{
-                  width: "100%",
-                  backgroundColor: loading === "checkout" ? "#27272A" : "#0ABF53",
-                  color: "#FFFFFF",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "0.6rem",
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  cursor: loading === "checkout" ? "not-allowed" : "pointer"
-                }}
-              >
-                {loading === "checkout" ? "Creating..." : "Create Checkout Session"}
-              </button>
-              
-              {sessionResult && (
-                <div style={{
-                  marginTop: "1rem",
-                  backgroundColor: "#0F0F11",
-                  border: "1px solid #27272A",
-                  borderRadius: "6px",
-                  padding: "0.75rem",
-                  fontSize: "0.8rem"
-                }}>
-                  <div style={{ fontWeight: 600, marginBottom: "0.25rem", color: "#FFFFFF" }}>Session Created!</div>
-                  <div style={{ textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", color: "#A1A1AA" }}>
-                    ID: {sessionResult.sessionId}
-                  </div>
-                  {sessionResult.url && (
-                    <a
-                      href={sessionResult.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: "block",
-                        marginTop: "0.5rem",
-                        color: "#0ABF53",
-                        textDecoration: "underline",
-                        fontWeight: 600
-                      }}
-                    >
-                      Open Checkout Redirect Page →
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
+      <div className="card">
+        <div className="card-header">
+          <span className="card-title">
+            Tokenised Cards
+            {paymentMethods.length > 0 && (
+              <span className="badge badge-accent">{paymentMethods.length}</span>
+            )}
+          </span>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <select className="select" style={{ width: "auto", fontSize: "0.75rem", padding: "0.3rem 2rem 0.3rem 0.5rem" }}
+              value={chargeCurrency} onChange={(e) => setChargeCurrency(e.target.value)}>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GBP">GBP</option>
+            </select>
+            <input className="input" type="number" style={{ width: "90px", fontSize: "0.75rem", padding: "0.3rem 0.5rem" }}
+              value={chargeAmount} onChange={(e) => setChargeAmount(parseInt(e.target.value) || 0)}
+              placeholder="Minor units" />
+            <Btn
+              className="btn btn-ghost btn-sm"
+              loading={isSyncing}
+              onClick={sync}
+            >
+              ↻ Sync
+            </Btn>
           </div>
         </div>
 
-        {/* Stored Cards */}
-        <section style={{
-          backgroundColor: "#18181B",
-          border: "1px solid #27272A",
-          borderRadius: "12px",
-          padding: "1.5rem",
-          marginBottom: "2rem"
-        }}>
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "1rem"
-          }}>
-            <h3 style={{ margin: 0, color: "#FFFFFF", fontSize: "1.1rem" }}>💳 Stored Payment Instruments</h3>
-            <button
-              onClick={handleSyncPaymentMethods}
-              disabled={loading === "sync-cards"}
-              style={{
-                backgroundColor: "#27272A",
-                color: "#FFFFFF",
-                border: "none",
-                borderRadius: "6px",
-                padding: "0.4rem 0.8rem",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                cursor: loading === "sync-cards" ? "not-allowed" : "pointer"
-              }}
-            >
-              {loading === "sync-cards" ? "Syncing..." : "Sync Cards from Adyen"}
-            </button>
+        {paymentMethods.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">🪪</div>
+            <p>No stored cards found for this shopper. Complete a checkout with card-saving enabled first.</p>
           </div>
-
-          {paymentMethods.length === 0 ? (
-            <div style={{
-              textAlign: "center",
-              padding: "2rem",
-              color: "#A1A1AA",
-              border: "1px dashed #27272A",
-              borderRadius: "8px"
-            }}>
-              No stored payment methods found for this shopper reference. Run checkout with card-saving consent first.
-            </div>
-          ) : (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: "1rem"
-            }}>
-              {paymentMethods.map((method) => (
-                <div
-                  key={method.recurringDetailReference}
-                  style={{
-                    backgroundColor: "#0F0F11",
-                    border: "1px solid #27272A",
-                    borderRadius: "8px",
-                    padding: "1rem",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between"
-                  }}
-                >
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{
-                        fontSize: "0.8rem",
-                        fontWeight: 600,
-                        backgroundColor: "#1C1C1E",
-                        padding: "0.2rem 0.5rem",
-                        borderRadius: "4px",
-                        textTransform: "uppercase"
-                      }}>
-                        {method.variant}
-                      </span>
-                      <span style={{
-                        fontSize: "0.75rem",
-                        color: method.status === "active" ? "#0ABF53" : "#EF4444"
-                      }}>
-                        ● {method.status}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, margin: "1rem 0 0.5rem 0", color: "#FFFFFF" }}>
-                      •••• •••• •••• {method.cardLast4 || "••••"}
-                    </div>
-                    {method.cardExpiryMonth && method.cardExpiryYear && (
-                      <div style={{ fontSize: "0.8rem", color: "#A1A1AA" }}>
-                        Expires: {method.cardExpiryMonth}/{method.cardExpiryYear}
-                      </div>
-                    )}
-                    <div style={{ fontSize: "0.7rem", color: "#A1A1AA", marginTop: "0.5rem", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                      Token: {method.recurringDetailReference}
-                    </div>
-                  </div>
-                  <div style={{
-                    display: "flex",
-                    gap: "0.5rem",
-                    marginTop: "1.25rem",
-                    borderTop: "1px solid #27272A",
-                    paddingTop: "0.75rem"
-                  }}>
-                    <button
-                      onClick={() => handleChargeCard(method.recurringDetailReference)}
-                      disabled={loading === `charge-${method.recurringDetailReference}`}
-                      style={{
-                        flex: 1,
-                        backgroundColor: "#0ABF53",
-                        color: "#FFFFFF",
-                        border: "none",
-                        borderRadius: "4px",
-                        padding: "0.4rem",
-                        fontSize: "0.8rem",
-                        fontWeight: 600,
-                        cursor: loading === `charge-${method.recurringDetailReference}` ? "not-allowed" : "pointer"
-                      }}
-                    >
-                      {loading === `charge-${method.recurringDetailReference}` ? "Charging..." : "Charge $15.00"}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCard(method.recurringDetailReference)}
-                      disabled={loading === `delete-${method.recurringDetailReference}`}
-                      style={{
-                        backgroundColor: "rgba(239, 68, 68, 0.15)",
-                        color: "#EF4444",
-                        border: "1px solid rgba(239, 68, 68, 0.3)",
-                        borderRadius: "4px",
-                        padding: "0.4rem 0.8rem",
-                        fontSize: "0.8rem",
-                        fontWeight: 600,
-                        cursor: loading === `delete-${method.recurringDetailReference}` ? "not-allowed" : "pointer"
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
+        ) : (
+          <div className="card-grid">
+            {paymentMethods.map((method: StoredCard) => (
+              <div className="credit-card" key={method.recurringDetailReference}>
+                <div className="credit-card-header">
+                  <span className="credit-card-network">{method.variant}</span>
+                  <span className={`badge badge-sm ${method.status === "active" ? "badge-green" : "badge-red"}`}>
+                    {method.status}
+                  </span>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
 
-        {/* Payments Table */}
-        <section style={{
-          backgroundColor: "#18181B",
-          border: "1px solid #27272A",
-          borderRadius: "12px",
-          padding: "1.5rem"
-        }}>
-          <h3 style={{ margin: "0 0 1.25rem 0", color: "#FFFFFF", fontSize: "1.1rem" }}>📜 Transaction Operations Log</h3>
+                <div className="credit-card-number">
+                  •••• •••• •••• {method.cardLast4 ?? "••••"}
+                </div>
 
-          {payments.length === 0 ? (
-            <div style={{
-              textAlign: "center",
-              padding: "2rem",
-              color: "#A1A1AA",
-              border: "1px dashed #27272A",
-              borderRadius: "8px"
-            }}>
-              No transactions recorded for this shopper. Use Checkout or Charge Card to make payments.
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                textAlign: "left",
-                fontSize: "0.9rem"
-              }}>
-                <thead>
-                  <tr style={{ borderBottom: "2px solid #27272A", color: "#A1A1AA" }}>
-                    <th style={{ padding: "0.75rem 0.5rem" }}>PSP Reference</th>
-                    <th style={{ padding: "0.75rem 0.5rem" }}>Merchant Ref</th>
-                    <th style={{ padding: "0.75rem 0.5rem" }}>Amount</th>
-                    <th style={{ padding: "0.75rem 0.5rem" }}>Method</th>
-                    <th style={{ padding: "0.75rem 0.5rem" }}>Status</th>
-                    <th style={{ padding: "0.75rem 0.5rem" }}>Date</th>
-                    <th style={{ padding: "0.75rem 0.5rem", textAlign: "right" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((payment) => {
-                    const isAuthorised = payment.status === "authorised";
-                    const isCaptured = payment.status === "captured";
+                <div className="credit-card-meta">
+                  <span>
+                    {method.cardExpiryMonth && method.cardExpiryYear
+                      ? `Expires ${method.cardExpiryMonth}/${method.cardExpiryYear}`
+                      : "Expiry unknown"}
+                  </span>
+                  <span className="badge badge-muted" style={{ fontSize: "0.65rem" }}>Saved</span>
+                </div>
 
-                    let statusBg = "#27272A";
-                    let statusColor = "#A1A1AA";
-                    if (payment.status === "authorised") { statusBg = "rgba(16, 185, 129, 0.15)"; statusColor = "#10B981"; }
-                    if (payment.status === "captured") { statusBg = "rgba(10, 191, 83, 0.15)"; statusColor = "#0ABF53"; }
-                    if (payment.status === "refunded") { statusBg = "rgba(59, 130, 246, 0.15)"; statusColor = "#3B82F6"; }
-                    if (payment.status === "cancelled") { statusBg = "rgba(239, 68, 68, 0.15)"; statusColor = "#EF4444"; }
-                    if (payment.status === "refused") { statusBg = "rgba(220, 38, 38, 0.15)"; statusColor = "#DC2626"; }
+                <div className="credit-card-token mono">{method.recurringDetailReference}</div>
 
-                    return (
-                      <tr key={payment.pspReference} style={{ borderBottom: "1px solid #27272A" }}>
-                        <td style={{ padding: "0.75rem 0.5rem", fontWeight: 500, color: "#FFFFFF" }}>{payment.pspReference}</td>
-                        <td style={{ padding: "0.75rem 0.5rem", color: "#A1A1AA" }}>{payment.merchantReference}</td>
-                        <td style={{ padding: "0.75rem 0.5rem", fontWeight: 600 }}>{formatCurrency(payment.amount, payment.currency)}</td>
-                        <td style={{ padding: "0.75rem 0.5rem", textTransform: "uppercase", fontSize: "0.8rem" }}>{payment.paymentMethod || "scheme"}</td>
-                        <td style={{ padding: "0.75rem 0.5rem" }}>
-                          <span style={{
-                            backgroundColor: statusBg,
-                            color: statusColor,
-                            padding: "0.2rem 0.5rem",
-                            borderRadius: "4px",
-                            fontSize: "0.75rem",
-                            fontWeight: 600,
-                            display: "inline-block"
-                          }}>
-                            {payment.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: "0.75rem 0.5rem", fontSize: "0.8rem", color: "#A1A1AA" }}>{formatDate(payment.created)}</td>
-                        <td style={{ padding: "0.75rem 0.5rem", textAlign: "right" }}>
-                          <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-                            {isAuthorised && (
-                              <>
-                                <button
-                                  onClick={() => handleCapture(payment.pspReference, payment.amount, payment.currency)}
-                                  disabled={loading === `capture-${payment.pspReference}`}
-                                  style={{
-                                    backgroundColor: "#0ABF53",
-                                    color: "#FFFFFF",
-                                    border: "none",
-                                    borderRadius: "4px",
-                                    padding: "0.3rem 0.6rem",
-                                    fontSize: "0.75rem",
-                                    fontWeight: 600,
-                                    cursor: loading === `capture-${payment.pspReference}` ? "not-allowed" : "pointer"
-                                  }}
-                                >
-                                  Capture
-                                </button>
-                                <button
-                                  onClick={() => handleCancel(payment.pspReference)}
-                                  disabled={loading === `cancel-${payment.pspReference}`}
-                                  style={{
-                                    backgroundColor: "rgba(239, 68, 68, 0.15)",
-                                    color: "#EF4444",
-                                    border: "1px solid rgba(239, 68, 68, 0.3)",
-                                    borderRadius: "4px",
-                                    padding: "0.3rem 0.6rem",
-                                    fontSize: "0.75rem",
-                                    fontWeight: 600,
-                                    cursor: loading === `cancel-${payment.pspReference}` ? "not-allowed" : "pointer"
-                                  }}
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            )}
-                            {isCaptured && (
-                              <button
-                                onClick={() => handleRefund(payment.pspReference, payment.amount, payment.currency)}
-                                disabled={loading === `refund-${payment.pspReference}`}
-                                style={{
-                                  backgroundColor: "rgba(59, 130, 246, 0.15)",
-                                  color: "#3B82F6",
-                                  border: "1px solid rgba(59, 130, 246, 0.3)",
-                                  borderRadius: "4px",
-                                  padding: "0.3rem 0.6rem",
-                                  fontSize: "0.75rem",
-                                  fontWeight: 600,
-                                  cursor: loading === `refund-${payment.pspReference}` ? "not-allowed" : "pointer"
-                                }}
+                <div className="credit-card-actions">
+                  <Btn
+                    className="btn btn-success btn-sm"
+                    style={{ flex: 1 }}
+                    loading={ops.isLoading(`charge:${method.recurringDetailReference}`)}
+                    onClick={() => handleCharge(method.recurringDetailReference)}
+                  >
+                    Charge {fmtCurrency(chargeAmount, chargeCurrency)}
+                  </Btn>
+                  <Btn
+                    className="btn btn-danger btn-sm"
+                    onClick={() => {
+                      if (confirm("Remove this stored card?")) remove(method.recurringDetailReference);
+                    }}
+                  >
+                    ✕
+                  </Btn>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** Transactions table */
+function TransactionsSection({
+  shopperRef, config, ops,
+}: {
+  shopperRef: string;
+  config: AdyenHooksConfig;
+  ops: ReturnType<typeof usePaymentOperations>;
+}) {
+  const { payments } = usePayments({ shopperReference: shopperRef, config });
+
+  const totalAuthorised = (payments as PaymentTransaction[])
+    .filter((p: PaymentTransaction) => p.status === "authorised" || p.status === "captured")
+    .reduce((acc: number, p: PaymentTransaction) => acc + p.amount, 0);
+
+  const currency = payments[0]?.currency ?? "EUR";
+
+  return (
+    <>
+      <div className="section-divider">
+        <h2>📜 Transactions</h2>
+      </div>
+
+      <div className="stats-row">
+        <div className="stat-chip">
+          <div className="stat-chip-label">Total</div>
+          <div className="stat-chip-value">{payments.length}</div>
+          <div className="stat-chip-sub">transactions</div>
+        </div>
+        <div className="stat-chip">
+          <div className="stat-chip-label">Authorised</div>
+          <div className="stat-chip-value">{(payments as PaymentTransaction[]).filter((p: PaymentTransaction) => p.status === "authorised").length}</div>
+          <div className="stat-chip-sub">awaiting capture</div>
+        </div>
+        <div className="stat-chip">
+          <div className="stat-chip-label">Captured</div>
+          <div className="stat-chip-value">{(payments as PaymentTransaction[]).filter((p: PaymentTransaction) => p.status === "captured").length}</div>
+          <div className="stat-chip-sub">settled</div>
+        </div>
+        <div className="stat-chip">
+          <div className="stat-chip-label">Volume</div>
+          <div className="stat-chip-value" style={{ fontSize: "1.1rem" }}>
+            {fmtCurrency(totalAuthorised, currency)}
+          </div>
+          <div className="stat-chip-sub">auth + captured</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        {payments.length === 0 ? (
+          <div className="empty-state" style={{ margin: "1.5rem" }}>
+            <div className="empty-state-icon">🧾</div>
+            <p>No transactions yet. Create a checkout session or charge a stored card.</p>
+          </div>
+        ) : (
+          <div className="table-wrapper" style={{ border: "none" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>PSP Reference</th>
+                  <th>Merchant Ref</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((tx: PaymentTransaction) => {
+                  const isAuthorised = tx.status === "authorised";
+                  const isCaptured   = tx.status === "captured";
+                  const badgeClass   = STATUS_BADGE[tx.status] ?? "badge-muted";
+
+                  return (
+                    <tr key={tx.pspReference}>
+                      <td>
+                        <span className="mono" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                          {tx.pspReference.slice(0, 16)}…
+                        </span>
+                      </td>
+                      <td style={{ color: "var(--text-secondary)" }}>{tx.merchantReference}</td>
+                      <td style={{ fontWeight: 600 }}>{fmtCurrency(tx.amount, tx.currency)}</td>
+                      <td>
+                        <span className="badge badge-muted" style={{ fontSize: "0.7rem", textTransform: "uppercase" }}>
+                          {tx.paymentMethod ?? "scheme"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`badge ${badgeClass}`}>{tx.status}</span>
+                      </td>
+                      <td style={{ color: "var(--text-muted)", fontSize: "0.78rem" }}>
+                        {fmtDate(tx.created)}
+                      </td>
+                      <td>
+                        <div className="tx-actions">
+                          {isAuthorised && (
+                            <>
+                              <Btn
+                                className="btn btn-success btn-sm"
+                                loading={ops.isLoading(`capture:${tx.pspReference}`)}
+                                onClick={() => ops.capture({ pspReference: tx.pspReference, amount: tx.amount, currency: tx.currency })}
                               >
-                                Refund
-                              </button>
-                            )}
-                            {!isAuthorised && !isCaptured && (
-                              <span style={{ fontSize: "0.8rem", color: "#71717A" }}>No operations available</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                                Capture
+                              </Btn>
+                              <Btn
+                                className="btn btn-danger btn-sm"
+                                loading={ops.isLoading(`cancel:${tx.pspReference}`)}
+                                onClick={() => ops.cancel({ pspReference: tx.pspReference })}
+                              >
+                                Cancel
+                              </Btn>
+                            </>
+                          )}
+                          {isCaptured && (
+                            <Btn
+                              className="btn btn-ghost btn-sm"
+                              loading={ops.isLoading(`refund:${tx.pspReference}`)}
+                              onClick={() => ops.refund({ pspReference: tx.pspReference, amount: tx.amount, currency: tx.currency })}
+                            >
+                              Refund
+                            </Btn>
+                          )}
+                          {!isAuthorised && !isCaptured && (
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>—</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Root App
+// ---------------------------------------------------------------------------
+export default function App() {
+  const [shopperRef, setShopperRef] = useState("test_shopper_1");
+  const [email, setEmail]           = useState("test@example.com");
+  const [name, setName]             = useState("Test Shopper");
+
+  const ops = usePaymentOperations(hooksConfig);
+
+  return (
+    <div className="app-shell">
+      <div className="app-container">
+
+        {/* ── Navbar ── */}
+        <nav className="navbar">
+          <div className="navbar-brand">
+            <div className="navbar-logo">💸</div>
+            <div>
+              <div className="navbar-title">Adyen Payments</div>
+              <div className="navbar-subtitle">Convex Component · TEST Mode</div>
             </div>
-          )}
-        </section>
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <span className="badge badge-accent">TEST env</span>
+            <span className="badge badge-green pulse-dot">Convex live</span>
+          </div>
+        </nav>
+
+        {/* ── Global error ── */}
+        {ops.error && (
+          <div className="error-banner">
+            <span>⚠</span>
+            <span><strong>Error:</strong> {ops.error}</span>
+            <button onClick={ops.clearError}>✕</button>
+          </div>
+        )}
+
+        {/* ── Top panels ── */}
+        <div className="grid-2">
+          <ShopperPanel
+            shopperRef={shopperRef} setShopperRef={setShopperRef}
+            email={email} setEmail={setEmail}
+            name={name} setName={setName}
+            config={hooksConfig}
+          />
+          <CheckoutPanel shopperRef={shopperRef} config={hooksConfig} />
+        </div>
+
+        {/* ── Stored cards ── */}
+        <StoredCardsSection shopperRef={shopperRef} config={hooksConfig} ops={ops} />
+
+        {/* ── Transactions ── */}
+        <TransactionsSection shopperRef={shopperRef} config={hooksConfig} ops={ops} />
 
       </div>
     </div>

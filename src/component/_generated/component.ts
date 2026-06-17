@@ -39,6 +39,21 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         null,
         Name
       >;
+      insertPaymentMethod: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          cardExpiryMonth?: string;
+          cardExpiryYear?: string;
+          cardLast4?: string;
+          metadata?: any;
+          recurringDetailReference: string;
+          shopperReference: string;
+          variant: string;
+        },
+        null,
+        Name
+      >;
       recordPayment: FunctionReference<
         "mutation",
         "internal",
