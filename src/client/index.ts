@@ -468,97 +468,146 @@ export interface RegisterRoutesConfig {
   ) => Promise<void>;
 }
 
+/**
+ * Creates a raw webhook handler function for use with `httpAction` in a
+ * `"use node"` file.
+ *
+ * Because `http.ts` cannot have the `"use node"` directive, the recommended
+ * pattern is:
+ *
+ * ```ts
+ * // adyenWebhooks.ts  — "use node"
+ * import { httpAction } from "./_generated/server";
+ * import { components } from "./_generated/api";
+ * import { createWebhookHandler } from "@abdssamie/adyen-payments";
+ *
+ * export const webhookHandler = httpAction(
+ *   createWebhookHandler(components.adyenPayments, { ... })
+ * );
+ *
+ * // http.ts  — no directive
+ * import { httpRouter } from "convex/server";
+ * import { webhookHandler } from "./adyenWebhooks";
+ *
+ * const http = httpRouter();
+ * http.route({ path: "/adyen/webhooks", method: "POST", handler: webhookHandler });
+ * export default http;
+ * ```
+ */
+export function createWebhookHandler(
+  component: AdyenComponent,
+  config?: Omit<RegisterRoutesConfig, "webhookPath">
+): (
+  ctx: GenericActionCtx<GenericDataModel>,
+  req: Request
+) => Promise<Response> {
+  const eventHandlers = config?.events ?? {};
+
+  return async (ctx, req) => {
+    const hmacKey = config?.ADYEN_HMAC_KEY || process.env.ADYEN_HMAC_KEY;
+
+    if (!hmacKey) {
+      console.error("❌ ADYEN_HMAC_KEY is not set");
+      return new Response("HMAC key not configured", { status: 500 });
+    }
+
+    let bodyText: string;
+    try {
+      bodyText = await req.text();
+    } catch (err) {
+      console.error("❌ Failed to read request body:", err);
+      return new Response("Failed to read body", { status: 400 });
+    }
+
+    let payload: {
+      notificationItems?: Array<{
+        NotificationRequestItem?: AdyenNotificationItem;
+      }>;
+    };
+    try {
+      payload = JSON.parse(bodyText);
+    } catch (err) {
+      console.error("❌ Failed to parse JSON:", err);
+      return new Response("Invalid JSON", { status: 400 });
+    }
+
+    const notificationItems = payload.notificationItems;
+    if (!Array.isArray(notificationItems)) {
+      console.error("❌ Invalid Adyen notification format");
+      return new Response("Invalid notification format", { status: 400 });
+    }
+
+    const validator = new hmacValidator();
+
+    for (const wrapper of notificationItems) {
+      const item = wrapper.NotificationRequestItem;
+      if (!item) continue;
+
+      // Verify HMAC signature
+      let isValid = false;
+      try {
+        isValid = validator.validateHMAC(item, hmacKey);
+      } catch (err) {
+        console.error("❌ HMAC validation threw an error:", err);
+      }
+
+      if (!isValid) {
+        console.error(
+          "❌ Adyen Webhook signature verification failed for PSP:",
+          item.pspReference
+        );
+        return new Response("Invalid signature", { status: 401 });
+      }
+
+      // Process notification with default DB sync handler
+      try {
+        await processNotification(ctx, component, item);
+
+        // Call generic handler if provided
+        if (config?.onNotification) {
+          await config.onNotification(ctx, item);
+        }
+
+        // Call custom event-specific handler if provided
+        const eventCode = item.eventCode as unknown as string;
+        const customHandler = eventHandlers[eventCode];
+        if (customHandler) {
+          await customHandler(ctx, item);
+        }
+      } catch (err) {
+        console.error("❌ Error processing webhook notification:", err);
+        return new Response("Error processing notification", { status: 500 });
+      }
+    }
+
+    // Adyen requires returning "[accepted]" to acknowledge receipt
+    return new Response("[accepted]", {
+      status: 200,
+      headers: { "Content-Type": "text/plain" },
+    });
+  };
+}
+
+/**
+ * Convenience helper that registers the Adyen webhook route directly on an
+ * `HttpRouter`.
+ *
+ * @deprecated Prefer `createWebhookHandler` + `httpAction` in a `"use node"`
+ * file — see the `createWebhookHandler` JSDoc for the recommended pattern.
+ * This function must be called from a `"use node"` file when used.
+ */
 export function registerRoutes(
   http: HttpRouter,
   component: AdyenComponent,
   config?: RegisterRoutesConfig
 ) {
   const webhookPath = config?.webhookPath ?? "/adyen/webhooks";
-  const eventHandlers = config?.events ?? {};
+  const { webhookPath: _drop, ...handlerConfig } = config ?? {};
 
   http.route({
     path: webhookPath,
     method: "POST",
-    handler: httpActionGeneric(async (ctx, req) => {
-      const hmacKey = config?.ADYEN_HMAC_KEY || process.env.ADYEN_HMAC_KEY;
-
-      if (!hmacKey) {
-        console.error("❌ ADYEN_HMAC_KEY is not set");
-        return new Response("HMAC key not configured", { status: 500 });
-      }
-
-      let bodyText: string;
-      try {
-        bodyText = await req.text();
-      } catch (err) {
-        console.error("❌ Failed to read request body:", err);
-        return new Response("Failed to read body", { status: 400 });
-      }
-
-      let payload: {
-        notificationItems?: Array<{
-          NotificationRequestItem?: AdyenNotificationItem;
-        }>;
-      };
-      try {
-        payload = JSON.parse(bodyText);
-      } catch (err) {
-        console.error("❌ Failed to parse JSON:", err);
-        return new Response("Invalid JSON", { status: 400 });
-      }
-
-      const notificationItems = payload.notificationItems;
-      if (!Array.isArray(notificationItems)) {
-        console.error("❌ Invalid Adyen notification format");
-        return new Response("Invalid notification format", { status: 400 });
-      }
-
-      const validator = new hmacValidator();
-
-      for (const wrapper of notificationItems) {
-        const item = wrapper.NotificationRequestItem;
-        if (!item) continue;
-
-        // Verify signature
-        let isValid = false;
-        try {
-          isValid = validator.validateHMAC(item, hmacKey);
-        } catch (err) {
-          console.error("❌ HMAC validation threw an error:", err);
-        }
-
-        if (!isValid) {
-          console.error("❌ Adyen Webhook signature verification failed for PSP:", item.pspReference);
-          return new Response("Invalid signature", { status: 401 });
-        }
-
-        // Process notification with default sync handler
-        try {
-          await processNotification(ctx, component, item);
-
-          // Call generic handler if provided
-          if (config?.onNotification) {
-            await config.onNotification(ctx, item);
-          }
-
-          // Call custom event handler if provided
-          const eventCode = item.eventCode as unknown as string;
-          const customHandler = eventHandlers[eventCode];
-          if (customHandler) {
-            await customHandler(ctx, item);
-          }
-        } catch (err) {
-          console.error("❌ Error processing webhook notification:", err);
-          return new Response("Error processing notification", { status: 500 });
-        }
-      }
-
-      // Adyen requires returning "[accepted]" literal string to acknowledge receipt
-      return new Response("[accepted]", {
-        status: 200,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }),
+    handler: httpActionGeneric(createWebhookHandler(component, handlerConfig)),
   });
 }
 
