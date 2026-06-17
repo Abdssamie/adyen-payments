@@ -132,6 +132,53 @@ export const updatePaymentStatus = mutation({
 });
 
 /**
+ * Insert or update a single tokenized payment method.
+ */
+export const insertPaymentMethod = mutation({
+  args: {
+    shopperReference: v.string(),
+    recurringDetailReference: v.string(),
+    variant: v.string(),
+    cardLast4: v.optional(v.string()),
+    cardExpiryMonth: v.optional(v.string()),
+    cardExpiryYear: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("payment_methods")
+      .withIndex("by_recurring_detail_reference", (q) =>
+        q.eq("recurringDetailReference", args.recurringDetailReference)
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: "active",
+        variant: args.variant,
+        cardLast4: args.cardLast4,
+        cardExpiryMonth: args.cardExpiryMonth,
+        cardExpiryYear: args.cardExpiryYear,
+        ...(args.metadata !== undefined && { metadata: args.metadata }),
+      });
+    } else {
+      await ctx.db.insert("payment_methods", {
+        shopperReference: args.shopperReference,
+        recurringDetailReference: args.recurringDetailReference,
+        variant: args.variant,
+        cardLast4: args.cardLast4,
+        cardExpiryMonth: args.cardExpiryMonth,
+        cardExpiryYear: args.cardExpiryYear,
+        status: "active",
+        metadata: args.metadata,
+      });
+    }
+    return null;
+  },
+});
+
+/**
  * Synchronize the active stored card/payment method tokens for a shopper.
  */
 export const syncPaymentMethods = mutation({

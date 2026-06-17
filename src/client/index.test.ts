@@ -1,5 +1,5 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
-import { AdyenPayments } from "./index.js";
+import { AdyenPayments, type ActionCtx } from "./index.js";
 import { components, initConvexTest } from "./setup.test.js";
 
 // Mock the Adyen SDK API calls
@@ -44,9 +44,15 @@ vi.mock("@adyen/api-library", () => {
     };
   }
 
+  class HmacValidatorMock {
+    validateHMAC = vi.fn().mockReturnValue(true);
+    validateBankingHMAC = vi.fn().mockReturnValue(true);
+  }
+
   return {
     Client: vi.fn(),
     CheckoutAPI: CheckoutAPIMock,
+    hmacValidator: HmacValidatorMock,
   };
 });
 
@@ -54,6 +60,7 @@ describe("AdyenPayments client class tests", () => {
   beforeEach(() => {
     process.env.ADYEN_API_KEY = "test_key";
     process.env.ADYEN_MERCHANT_ACCOUNT = "test_merchant";
+    process.env.APP_URL = "https://example.com";
   });
 
   test("constructor configuration", () => {
@@ -67,7 +74,7 @@ describe("AdyenPayments client class tests", () => {
     const t = initConvexTest();
     const payments = new AdyenPayments(components.adyenPayments);
 
-    const shopperRef = await payments.createShopper(t as any, {
+    const shopperRef = await payments.createShopper(t as unknown as ActionCtx, {
       shopperReference: "shopper_1",
       email: "shopper1@example.com",
     });
@@ -78,7 +85,7 @@ describe("AdyenPayments client class tests", () => {
     const t = initConvexTest();
     const payments = new AdyenPayments(components.adyenPayments);
 
-    const session = await payments.createCheckoutSession(t as any, {
+    const session = await payments.createCheckoutSession(t as unknown as ActionCtx, {
       amount: 1500,
       currency: "USD",
       successUrl: "https://example.com/success",
@@ -93,7 +100,7 @@ describe("AdyenPayments client class tests", () => {
     const t = initConvexTest();
     const payments = new AdyenPayments(components.adyenPayments);
 
-    const chargeResult = await payments.chargeStoredCard(t as any, {
+    const chargeResult = await payments.chargeStoredCard(t as unknown as ActionCtx, {
       shopperReference: "shopper_1",
       recurringDetailReference: "token_123",
       amount: 5000,

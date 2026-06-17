@@ -1,18 +1,23 @@
 "use node";
 
-import { Client, CheckoutAPI } from "@adyen/api-library";
+import { Client, CheckoutAPI, hmacValidator } from "@adyen/api-library";
+import type { Types } from "@adyen/api-library";
 import type {
   CreateCheckoutSessionRequest,
   PaymentRequest,
+  CardDetails,
+  StoredPaymentMethod,
 } from "@adyen/api-library/lib/src/typings/checkout/models.js";
-import { v } from "convex/values";
 import type {
   GenericActionCtx,
   GenericMutationCtx,
   GenericQueryCtx,
   GenericDataModel,
+  HttpRouter,
 } from "convex/server";
+import { httpActionGeneric } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
+import { NotificationRequestItem } from "@adyen/api-library/lib/src/typings/notification/models.js";
 
 // Convenient types for ctx args, matching Stripe component
 type QueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
@@ -20,12 +25,14 @@ type MutationCtx = Pick<
   GenericMutationCtx<GenericDataModel>,
   "runQuery" | "runMutation"
 >;
-type ActionCtx = Pick<
+export type ActionCtx = Pick<
   GenericActionCtx<GenericDataModel>,
   "runQuery" | "runMutation" | "runAction"
 >;
 
 export type AdyenComponent = ComponentApi;
+
+export const EventCodeEnum = NotificationRequestItem.EventCodeEnum;
 
 export interface AdyenPaymentsOptions {
   ADYEN_API_KEY?: string;
@@ -225,7 +232,7 @@ export class AdyenPayments {
     });
 
     const storedMethods = response.storedPaymentMethods || [];
-    const mappedMethods = storedMethods.map((m: any) => ({
+    const mappedMethods = storedMethods.map((m: StoredPaymentMethod) => ({
       recurringDetailReference: m.id || "",
       variant: m.brand || m.type || "unknown",
       cardLast4: m.lastFour || undefined,
@@ -298,16 +305,23 @@ export class AdyenPayments {
     const merchantReference =
       args.reference ?? `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
+    const returnUrl = args.returnUrl ?? process.env.APP_URL;
+    if (!returnUrl) {
+      throw new Error(
+        "returnUrl must be provided in chargeStoredCard arguments or configured via the APP_URL environment variable"
+      );
+    }
+
     const response = await checkout.PaymentsApi.payments({
       amount: { value: args.amount, currency: args.currency },
       reference: merchantReference,
       merchantAccount: this.merchantAccount,
       shopperReference: args.shopperReference,
-      returnUrl: args.returnUrl ?? "https://example.com",
+      returnUrl,
       paymentMethod: {
-        type: "scheme",
+        type: "scheme" as CardDetails.TypeEnum,
         storedPaymentMethodId: args.recurringDetailReference,
-      } as any,
+      } as CardDetails,
       shopperInteraction: "ContAuth" as PaymentRequest.ShopperInteractionEnum,
       recurringProcessingModel: "Subscription" as PaymentRequest.RecurringProcessingModelEnum,
     });
@@ -430,5 +444,254 @@ export class AdyenPayments {
       pspReference: response.pspReference,
       status: response.status,
     };
+  }
+}
+
+export type AdyenNotificationItem = Types.notification.NotificationRequestItem & {
+  shopperReference?: string;
+};
+
+export interface AdyenEventHandlers {
+  [eventCode: string]: (
+    ctx: ActionCtx,
+    notification: AdyenNotificationItem
+  ) => Promise<void>;
+}
+
+export interface RegisterRoutesConfig {
+  webhookPath?: string;
+  ADYEN_HMAC_KEY?: string;
+  events?: AdyenEventHandlers;
+  onNotification?: (
+    ctx: ActionCtx,
+    notification: AdyenNotificationItem
+  ) => Promise<void>;
+}
+
+export function registerRoutes(
+  http: HttpRouter,
+  component: AdyenComponent,
+  config?: RegisterRoutesConfig
+) {
+  const webhookPath = config?.webhookPath ?? "/adyen/webhooks";
+  const eventHandlers = config?.events ?? {};
+
+  http.route({
+    path: webhookPath,
+    method: "POST",
+    handler: httpActionGeneric(async (ctx, req) => {
+      const hmacKey = config?.ADYEN_HMAC_KEY || process.env.ADYEN_HMAC_KEY;
+
+      if (!hmacKey) {
+        console.error("❌ ADYEN_HMAC_KEY is not set");
+        return new Response("HMAC key not configured", { status: 500 });
+      }
+
+      let bodyText: string;
+      try {
+        bodyText = await req.text();
+      } catch (err) {
+        console.error("❌ Failed to read request body:", err);
+        return new Response("Failed to read body", { status: 400 });
+      }
+
+      let payload: {
+        notificationItems?: Array<{
+          NotificationRequestItem?: AdyenNotificationItem;
+        }>;
+      };
+      try {
+        payload = JSON.parse(bodyText);
+      } catch (err) {
+        console.error("❌ Failed to parse JSON:", err);
+        return new Response("Invalid JSON", { status: 400 });
+      }
+
+      const notificationItems = payload.notificationItems;
+      if (!Array.isArray(notificationItems)) {
+        console.error("❌ Invalid Adyen notification format");
+        return new Response("Invalid notification format", { status: 400 });
+      }
+
+      const validator = new hmacValidator();
+
+      for (const wrapper of notificationItems) {
+        const item = wrapper.NotificationRequestItem;
+        if (!item) continue;
+
+        // Verify signature
+        let isValid = false;
+        try {
+          isValid = validator.validateHMAC(item, hmacKey);
+        } catch (err) {
+          console.error("❌ HMAC validation threw an error:", err);
+        }
+
+        if (!isValid) {
+          console.error("❌ Adyen Webhook signature verification failed for PSP:", item.pspReference);
+          return new Response("Invalid signature", { status: 401 });
+        }
+
+        // Process notification with default sync handler
+        try {
+          await processNotification(ctx, component, item);
+
+          // Call generic handler if provided
+          if (config?.onNotification) {
+            await config.onNotification(ctx, item);
+          }
+
+          // Call custom event handler if provided
+          const eventCode = item.eventCode as unknown as string;
+          const customHandler = eventHandlers[eventCode];
+          if (customHandler) {
+            await customHandler(ctx, item);
+          }
+        } catch (err) {
+          console.error("❌ Error processing webhook notification:", err);
+          return new Response("Error processing notification", { status: 500 });
+        }
+      }
+
+      // Adyen requires returning "[accepted]" literal string to acknowledge receipt
+      return new Response("[accepted]", {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }),
+  });
+}
+
+async function processNotification(
+  ctx: ActionCtx,
+  component: AdyenComponent,
+  item: AdyenNotificationItem
+): Promise<void> {
+  const eventCode = item.eventCode;
+  const success = (item.success as unknown as string) === "true";
+  const pspReference = item.pspReference;
+  const originalReference = item.originalReference;
+  const merchantReference = item.merchantReference;
+  const amountValue = item.amount?.value;
+  const amountCurrency = item.amount?.currency;
+
+  switch (eventCode) {
+    case EventCodeEnum.Authorisation: {
+      const status = success ? "authorised" : "refused";
+
+      await ctx.runMutation(component.private.recordPayment, {
+        pspReference,
+        originalReference,
+        merchantReference,
+        amount: amountValue ?? 0,
+        currency: amountCurrency ?? "unknown",
+        status,
+        paymentMethod: item.paymentMethod,
+        shopperReference: item.shopperReference,
+      });
+
+      if (success && item.additionalData) {
+        const recurringDetailReference = item.additionalData["recurring.recurringDetailReference"];
+        const variant = item.additionalData["paymentMethod"] || item.paymentMethod || "scheme";
+        const cardLast4 = item.additionalData["cardSummary"];
+
+        const expiryDate = item.additionalData["expiryDate"];
+        let cardExpiryMonth: string | undefined;
+        let cardExpiryYear: string | undefined;
+        if (expiryDate && expiryDate.includes("/")) {
+          const parts = expiryDate.split("/");
+          cardExpiryMonth = parts[0];
+          cardExpiryYear = parts[1];
+        }
+
+        if (recurringDetailReference && item.shopperReference) {
+          await ctx.runMutation(component.private.insertPaymentMethod, {
+            shopperReference: item.shopperReference,
+            recurringDetailReference,
+            variant,
+            cardLast4,
+            cardExpiryMonth,
+            cardExpiryYear,
+          });
+        }
+      }
+      break;
+    }
+
+    case EventCodeEnum.RecurringContract: {
+      if (success && item.additionalData && item.shopperReference) {
+        const recurringDetailReference = item.additionalData["recurring.recurringDetailReference"];
+        const variant = item.additionalData["paymentMethod"] || item.paymentMethod || "scheme";
+        const cardLast4 = item.additionalData["cardSummary"];
+
+        const expiryDate = item.additionalData["expiryDate"];
+        let cardExpiryMonth: string | undefined;
+        let cardExpiryYear: string | undefined;
+        if (expiryDate && expiryDate.includes("/")) {
+          const parts = expiryDate.split("/");
+          cardExpiryMonth = parts[0];
+          cardExpiryYear = parts[1];
+        }
+
+        if (recurringDetailReference) {
+          await ctx.runMutation(component.private.insertPaymentMethod, {
+            shopperReference: item.shopperReference,
+            recurringDetailReference,
+            variant,
+            cardLast4,
+            cardExpiryMonth,
+            cardExpiryYear,
+          });
+        }
+      }
+      break;
+    }
+
+    case EventCodeEnum.Capture: {
+      const status = success ? "captured" : "capture_failed";
+      const targetReference = originalReference || pspReference;
+      await ctx.runMutation(component.private.updatePaymentStatus, {
+        pspReference: targetReference,
+        status,
+        originalReference: pspReference,
+      });
+      break;
+    }
+
+    case EventCodeEnum.Refund: {
+      const status = success ? "refunded" : "refund_failed";
+      const targetReference = originalReference || pspReference;
+      await ctx.runMutation(component.private.updatePaymentStatus, {
+        pspReference: targetReference,
+        status,
+        originalReference: pspReference,
+      });
+      break;
+    }
+
+    case EventCodeEnum.Cancellation: {
+      const status = success ? "cancelled" : "cancel_failed";
+      const targetReference = originalReference || pspReference;
+      await ctx.runMutation(component.private.updatePaymentStatus, {
+        pspReference: targetReference,
+        status,
+        originalReference: pspReference,
+      });
+      break;
+    }
+
+    case EventCodeEnum.CancelOrRefund: {
+      if (success) {
+        const action = item.additionalData?.["modification.action"];
+        const status = action === "cancel" ? "cancelled" : "refunded";
+        const targetReference = originalReference || pspReference;
+        await ctx.runMutation(component.private.updatePaymentStatus, {
+          pspReference: targetReference,
+          status,
+          originalReference: pspReference,
+        });
+      }
+      break;
+    }
   }
 }
