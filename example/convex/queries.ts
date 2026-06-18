@@ -28,3 +28,12 @@ export const listPayments = query({
     });
   },
 });
+
+export const getCheckoutSession = query({
+  args: { merchantReference: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.runQuery(components.adyenPayments.public.getCheckoutSessionByMerchantReference, {
+      merchantReference: args.merchantReference,
+    });
+  },
+});
