@@ -20,8 +20,8 @@ import type { ComponentApi } from "../component/_generated/component.js";
 import { NotificationRequestItem } from "@adyen/api-library/lib/src/typings/notification/models.js";
 
 // Convenient types for ctx args, matching Stripe component
-type QueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
-type MutationCtx = Pick<
+export type QueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
+export type MutationCtx = Pick<
   GenericMutationCtx<GenericDataModel>,
   "runQuery" | "runMutation"
 >;
@@ -308,7 +308,7 @@ export class AdyenPayments {
 
     const updatedMethods = currentMethods
       .filter((m) => m.recurringDetailReference !== args.recurringDetailReference)
-      .map(({ shopperReference, ...rest }) => rest);
+      .map(({ shopperReference: _shopperReference, ...rest }) => rest);
 
     await ctx.runMutation(this.component.private.syncPaymentMethods, {
       shopperReference: args.shopperReference,

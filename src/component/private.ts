@@ -81,7 +81,7 @@ export const recordPayment = mutation({
         metadata: args.metadata,
       });
     } else {
-      await ctx.db.patch(existing._id, {
+      await ctx.db.patch("payments", existing._id, {
         status: args.status,
         ...(args.shopperReference !== undefined && { shopperReference: args.shopperReference }),
         ...(args.userId !== undefined && { userId: args.userId }),
@@ -112,7 +112,7 @@ export const updatePaymentStatus = mutation({
       .unique();
 
     if (payment) {
-      await ctx.db.patch(payment._id, {
+      await ctx.db.patch("payments", payment._id, {
         status: args.status,
         ...(args.originalReference !== undefined && { originalReference: args.originalReference }),
       });
@@ -156,7 +156,7 @@ export const insertPaymentMethod = mutation({
       .unique();
 
     if (existing) {
-      await ctx.db.patch(existing._id, {
+      await ctx.db.patch("payment_methods", existing._id, {
         status: "active",
         variant: args.variant,
         cardLast4: args.cardLast4,
@@ -217,7 +217,7 @@ export const syncPaymentMethods = mutation({
         !incomingRefs.has(method.recurringDetailReference) &&
         method.status !== "disabled"
       ) {
-        await ctx.db.patch(method._id, { status: "disabled" });
+        await ctx.db.patch("payment_methods", method._id, { status: "disabled" });
       }
     }
 
@@ -227,7 +227,7 @@ export const syncPaymentMethods = mutation({
         (m) => m.recurringDetailReference === method.recurringDetailReference
       );
       if (match) {
-        await ctx.db.patch(match._id, {
+        await ctx.db.patch("payment_methods", match._id, {
           status: "active",
           variant: method.variant,
           cardLast4: method.cardLast4,
@@ -270,7 +270,7 @@ export const updateCheckoutSessionStatus = mutation({
       .unique();
 
     if (session) {
-      await ctx.db.patch(session._id, { status: args.status });
+      await ctx.db.patch("checkout_sessions", session._id, { status: args.status });
     }
     return null;
   },

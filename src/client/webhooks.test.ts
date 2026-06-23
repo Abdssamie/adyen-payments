@@ -25,9 +25,9 @@ describe("Adyen webhook processing tests", () => {
     const t = initConvexTest();
 
     // Register routes with a mock HTTP router
-    const routes: Array<{ path: string; method: string; handler: Function }> = [];
+    const routes: Array<{ path: string; method: string; handler: (...args: any[]) => any }> = [];
     const mockHttp = {
-      route: (r: { path: string; method: string; handler: Function }) => {
+      route: (r: { path: string; method: string; handler: (...args: any[]) => any }) => {
         routes.push(r);
       },
     } as unknown as HttpRouter;
@@ -120,9 +120,9 @@ describe("Adyen webhook processing tests", () => {
       shopperReference: "user_def",
     });
 
-    const routes: Array<{ path: string; method: string; handler: Function }> = [];
+    const routes: Array<{ path: string; method: string; handler: (...args: any[]) => any }> = [];
     const mockHttp = {
-      route: (r: { path: string; method: string; handler: Function }) => {
+      route: (r: { path: string; method: string; handler: (...args: any[]) => any }) => {
         routes.push(r);
       },
     } as unknown as HttpRouter;

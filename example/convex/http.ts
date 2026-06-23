@@ -18,7 +18,7 @@ http.route({
     try {
       const responseText = await ctx.runAction(
         internal.adyenWebhooks.handleWebhook,
-        { bodyText }
+        { bodyText, url: request.url }
       );
       return new Response(responseText, {
         status: 200,

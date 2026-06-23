@@ -1,88 +1,22 @@
-# Convex Component Template
+# Convex Adyen Payments
 
-This is a Convex component, ready to be published on npm.
+[![npm version](https://badge.fury.io/js/@abdssamie%2Fadyen-payments.svg)](https://badge.fury.io/js/@abdssamie%2Fadyen-payments)
 
-To create your own component:
-
-1. Write code in src/component for your component. Component-specific tables,
-   queries, mutations, and actions go here.
-1. Write code in src/client for the Class that interfaces with the component.
-   This is the bridge your users will access to get information into and out of
-   your component
-1. Write example usage in example/convex/example.ts.
-1. Delete the text in this readme until `---` and flesh out the README.
-1. Publish to npm with `npm run alpha` or `npm run release`.
-
-To develop your component run a dev process in the example project:
-
-```sh
-npm i
-npm run dev
-```
-
-`npm run dev` will start a file watcher to re-build the component, as well as
-the example project backend, which installs and uses the component. Run
-`npm run dev:frontend` to interact with it through a Vite app.
-
-Modify the schema and index files in src/component/ to define your component.
-
-Write a client for using this component in src/client/index.ts.
-
-If you won't be adding frontend code (e.g. React components) to this component
-you can delete "./react" references in package.json and "src/react/" directory.
-If you will be adding frontend code, add a peer dependency on React in
-package.json.
-
-### Component Directory structure
-
-```
-.
-├── README.md           documentation of your component
-├── package.json        component name, version number, other metadata
-├── package-lock.json   Components are like libraries, package-lock.json
-│                       is .gitignored and ignored by consumers.
-├── src
-│   ├── component/
-│   │   ├── _generated/ Files here are generated for the component.
-│   │   ├── convex.config.ts  Name your component here and use other components
-│   │   ├── lib.ts    Define functions here and in new files in this directory
-│   │   └── schema.ts   schema specific to this component
-│   ├── client/
-│   │   └── index.ts    Code that needs to run in the app that uses the
-│   │                   component. Generally the app interacts directly with
-│   │                   the component's exposed API (src/component/*).
-│   └── react/          Code intended to be used on the frontend goes here.
-│       │               Your are free to delete this if this component
-│       │               does not provide code.
-│       └── index.ts
-├── example/            example Convex app that uses this component
-│   └── convex/
-│       ├── _generated/       Files here are generated for the example app.
-│       ├── convex.config.ts  Imports and uses this component
-│       ├── myFunctions.ts    Functions that use the component
-│       └── schema.ts         Example app schema
-└── dist/               Publishing artifacts will be created here.
-```
+A Convex component that integrates your application with **Adyen Payments**. It enables checkout sessions (supporting the Adyen Drop-in & Web Components SDK), secure payment tokenization for recurring billing, and automatic database updates via HMAC-validated webhooks.
 
 ---
 
-# Convex Adyen Payments
+## 🚀 Installation
 
-[![npm version](https://badge.fury.io/js/@example%2Fadyen-payments.svg)](https://badge.fury.io/js/@example%2Fadyen-payments)
+Install the package in your project:
 
-<!-- START: Include on https://convex.dev/components -->
+```sh
+npm install @abdssamie/adyen-payments
+# or
+pnpm add @abdssamie/adyen-payments
+```
 
-- [ ] What is some compelling syntax as a hook?
-- [ ] Why should you use this component?
-- [ ] Links to docs / other resources?
-
-Found a bug? Feature request?
-[File it here](https://github.com/Abdssamie/adyen-payments/issues).
-
-## Installation
-
-Create a `convex.config.ts` file in your app's `convex/` folder and install the
-component by calling `use`:
+Create or update your `convex/convex.config.ts` file to import and use the component:
 
 ```ts
 // convex/convex.config.ts
@@ -95,52 +29,228 @@ app.use(adyenPayments);
 export default app;
 ```
 
-## Usage
+---
+
+## 🔑 Environment Variables & Dashboard Configuration
+
+The component requires the following environment variables. Set them in your Convex dashboard under **Settings** > **Environment Variables** or locally in `.env.local`:
+
+| Environment Variable | Description |
+| :--- | :--- |
+| `ADYEN_API_KEY` | Server-side API key for executing requests (e.g. `AQEy...`). |
+| `ADYEN_MERCHANT_ACCOUNT` | The merchant account code (e.g. `CompanyAccountECOM`). |
+| `ADYEN_ENVIRONMENT` | Set to `TEST` for sandbox testing, or `LIVE` for production. |
+| `ADYEN_HMAC_KEY` | HMAC signature key for validating incoming webhook authenticity. |
+| `APP_URL` | Base URL of your app (e.g. `https://myapp.com` or `http://localhost:3000`). |
+
+### How to Get Your Credentials from the Adyen Customer Area
+
+#### 1. Retrieve the Merchant Account Name
+1. Log in to the [Adyen Customer Area](https://ca-live.adyen.com/ca/ca/login.shtml) (use sandbox for testing, live for production).
+2. Click the account switcher in the top-left corner.
+3. Toggle to your specific **Merchant Account** (which handles payments) rather than the **Company Account** (used for administration).
+4. Copy the unique account name/code. This is your `ADYEN_MERCHANT_ACCOUNT`.
+
+#### 2. Generate an API Key
+1. In the account switcher, select your **Company Account** level.
+2. In the sidebar, navigate to **Developers** > **API credentials**.
+3. Select your integration's web service user (typically starting with `ws@Company.[YourCompanyAccount]`).
+4. Under **Server settings** > **Authentication**, click the **API key** tab.
+5. Click **Generate API key**.
+6. **Important**: Copy this key immediately and store it securely. You cannot view it again once you navigate away. Click **Save changes** at the bottom of the page.
+
+#### 3. Set Up Webhooks & Generate an HMAC Key
+1. Select your specific **Merchant Account** in the switcher.
+2. Go to **Developers** > **Webhooks** in the sidebar.
+3. Click **+ Webhook** on the top-right.
+4. Select **Standard Webhook** and click **Add**.
+5. Set the **Server URL** to your Convex deployment site endpoint (e.g., `https://<your-deployment>.convex.site/adyen/webhooks`).
+6. Scroll down to the **Security** tab and click **Generate** under the HMAC Key section.
+7. Copy the generated HMAC key. This is your `ADYEN_HMAC_KEY`.
+8. Ensure the webhook state is toggled to **Active** and click **Save configuration**.
+
+---
+
+## 💻 Usage
+
+To use the client, import `AdyenPayments` and initialize it with your registered component:
 
 ```ts
+import { AdyenPayments } from "@abdssamie/adyen-payments";
 import { components } from "./_generated/api";
 
-export const addComment = mutation({
-  args: { text: v.string(), targetId: v.string() },
+const adyenClient = new AdyenPayments(components.adyenPayments, {
+  autoCapture: true, // If true (default), capture immediately. Set false for manual capture.
+});
+```
+
+### 1. Initializing Checkout
+Create an action in your app's `convex/` folder to initialize a payment checkout session. This provides the `sessionId` and configuration payload required by Adyen's frontend Drop-in/Components SDK.
+
+```ts
+import { action } from "./_generated/server";
+import { v } from "convex/values";
+
+export const startCheckout = action({
+  args: {
+    amount: v.number(), // Value in minor units (e.g., 1000 for $10.00)
+    currency: v.string(), // e.g. "USD", "EUR"
+    shopperReference: v.string(), // Unique shopper identifier
+  },
   handler: async (ctx, args) => {
-    return await ctx.runMutation(components.adyenPayments.lib.add, {
-      text: args.text,
-      targetId: args.targetId,
-      userId: await getAuthUserId(ctx),
+    const session = await adyenClient.createCheckoutSession(ctx, {
+      amount: args.amount,
+      currency: args.currency,
+      successUrl: `https://myapp.com/checkout/success`,
+      cancelUrl: `https://myapp.com/checkout/cancel`,
+      shopperReference: args.shopperReference,
+    });
+    return session; // Returns { sessionId, sessionData, url }
+  },
+});
+```
+
+### 2. Charging a Stored Card (Recurring / MIT)
+When a shopper pays during checkout and consents to saving their payment details, Adyen stores a token. You can trigger recurring charges from a backend action:
+
+```ts
+export const chargeRecurring = action({
+  args: {
+    shopperReference: v.string(),
+    recurringDetailReference: v.string(), // The stored card token
+    amount: v.number(),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await adyenClient.chargeStoredCard(ctx, {
+      shopperReference: args.shopperReference,
+      recurringDetailReference: args.recurringDetailReference,
+      amount: args.amount,
+      currency: args.currency,
     });
   },
 });
 ```
 
-See more example usage in [example.ts](./example/convex/example.ts).
-
-### HTTP Routes
-
-You can register HTTP routes for the component to expose HTTP endpoints:
+### 3. Payment Modifications (Manual Capture, Refund, Cancel)
+If you configure `autoCapture: false` (manual capture), you must manually capture authorizations:
 
 ```ts
-import { httpRouter } from "convex/server";
-import { registerRoutes } from "@abdssamie/adyen-payments";
+export const capture = action({
+  args: { pspReference: v.string(), amount: v.number(), currency: v.string() },
+  handler: async (ctx, args) => {
+    return await adyenClient.capturePayment(ctx, args);
+  },
+});
+
+export const refund = action({
+  args: { pspReference: v.string(), amount: v.number(), currency: v.string() },
+  handler: async (ctx, args) => {
+    return await adyenClient.refundPayment(ctx, args);
+  },
+});
+
+export const cancel = action({
+  args: { pspReference: v.string() },
+  handler: async (ctx, args) => {
+    return await adyenClient.cancelPayment(ctx, args);
+  },
+});
+```
+
+---
+
+## 🔔 Webhook Integration
+
+Adyen webhooks require a Node.js context because signature verification depends on Node-native packages. Define the handler inside a `"use node"` file, and map it inside your `http.ts` router.
+
+### 1. Webhook Handler (`convex/adyenWebhooks.ts`)
+```ts
+"use node";
+
+import { internalAction } from "./_generated/server";
 import { components } from "./_generated/api";
+import { createWebhookHandler } from "@abdssamie/adyen-payments";
+import { v } from "convex/values";
+
+// Create raw handler with custom hooks if needed
+const rawHandler = createWebhookHandler(components.adyenPayments, {
+  events: {
+    AUTHORISATION: async (ctx, notification) => {
+      console.log(`Payment authorized for order: ${notification.merchantReference}`);
+    },
+    CAPTURE: async (ctx, notification) => {
+      console.log(`Payment captured: ${notification.pspReference}`);
+    },
+  },
+});
+
+export const handleWebhook = internalAction({
+  args: { bodyText: v.string(), url: v.string() },
+  handler: async (ctx, args) => {
+    const request = new Request(args.url, {
+      method: "POST",
+      body: args.bodyText,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await rawHandler(ctx, request);
+    if (!response.ok) {
+      throw new Error(`Webhook error: ${response.status}`);
+    }
+    return await response.text();
+  },
+});
+```
+
+### 2. HTTP Routing (`convex/http.ts`)
+```ts
+import { httpRouter } from "convex/server";
+import { httpAction } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 const http = httpRouter();
 
-registerRoutes(http, components.adyenPayments, {
-  pathPrefix: "/comments",
+http.route({
+  path: "/adyen/webhooks",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const bodyText = await request.text();
+    try {
+      const responseText = await ctx.runAction(
+        internal.adyenWebhooks.handleWebhook,
+        { bodyText, url: request.url }
+      );
+      return new Response(responseText, {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      });
+    } catch (err) {
+      console.error("Webhook processing error:", err);
+      return new Response("Webhook Error", { status: 400 });
+    }
+  }),
 });
 
 export default http;
 ```
 
-This will expose a GET endpoint that returns the most recent comment as JSON.
-The endpoint requires a `targetId` query parameter. See
-[http.ts](./example/convex/http.ts) for a complete example.
+---
 
-<!-- END: Include on https://convex.dev/components -->
+## 🛠️ Developing the Component
 
-Run the example:
+To contribute or make changes to the component repository itself, follow these steps to test and compile local changes:
 
 ```sh
-npm i
-npm run dev
+# Install dependencies
+pnpm install
+
+# Run the dev watcher (recompiles the component and runs example backend)
+pnpm dev
+
+# Run unit tests
+pnpm test
+
+# Lint files
+pnpm lint
 ```
