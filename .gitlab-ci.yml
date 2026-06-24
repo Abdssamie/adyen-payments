@@ -1,0 +1,50 @@
+image: node:24
+
+stages:
+  - validate
+  - publish
+
+variables:
+  PNPM_HOME: "$CI_PROJECT_DIR/.pnpm"
+  PNPM_STORE_DIR: "$CI_PROJECT_DIR/.pnpm-store"
+
+cache:
+  key:
+    files:
+      - pnpm-lock.yaml
+  paths:
+    - .pnpm-store/
+    - .pnpm/
+
+before_script:
+  - corepack enable
+  - corepack prepare pnpm@10.33.1 --activate
+  - pnpm config set store-dir "$PNPM_STORE_DIR"
+  - pnpm install --frozen-lockfile
+
+validate:
+  stage: validate
+  script:
+    - pnpm run build
+    - pnpm run typecheck
+    - pnpm run test --pool=forks
+  rules:
+    - if: "$CI_PIPELINE_SOURCE == 'merge_request_event'"
+    - if: "$CI_COMMIT_BRANCH"
+    - if: "$CI_COMMIT_TAG"
+
+publish:npm:
+  stage: publish
+  needs:
+    - validate
+  id_tokens:
+    NPM_ID_TOKEN:
+      aud: "npm:registry.npmjs.org"
+    SIGSTORE_ID_TOKEN:
+      aud: sigstore
+  script:
+    - node -e 'const pkg = require("./package.json"); const tag = process.env.CI_COMMIT_TAG || ""; const expected = "v" + pkg.version; if (tag !== expected) throw new Error("Tag " + tag + " does not match package version " + expected);'
+    - pnpm run build
+    - npm publish --access public
+  rules:
+    - if: "$CI_COMMIT_TAG =~ /^v\\d+\\.\\d+\\.\\d+$/"
