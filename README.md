@@ -110,11 +110,7 @@ export const startCheckout = action({
 });
 ```
 
-> [!IMPORTANT]
-> **Limitation — Drop-in / Web Components only.**
-> `createCheckoutSession` uses the [Adyen Sessions API](https://docs.adyen.com/online-payments/build-your-integration/sessions-flow/) which is designed to initialise the **Adyen Drop-in or Web Components SDK** embedded in your own page.
->
-> It does **not** support Adyen's **hosted checkout pages** (HPP) or **Pay By Link** products. The `url` field in the session response is **optional** and will be `null` for most merchant account configurations — do not rely on it for a redirect flow. To embed the Drop-in, pass `sessionId` and `sessionData` to the `@adyen/adyen-web` SDK in your frontend.
+> **Note:** This component supports the Adyen Drop-in and Web Components SDK only. It does not support hosted checkout pages (HPP) or Pay By Link — the `url` field in the session response is optional and `null` for most merchant configurations.
 
 ### 2. Charging a Stored Card (Recurring / MIT)
 When a shopper pays during checkout and consents to saving their payment details, Adyen stores a token. You can trigger recurring charges from a backend action:
