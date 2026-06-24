@@ -812,12 +812,10 @@ function Topbar({
 function OverviewPage({
   shopperRef,
   config,
-  ops,
   setPage,
 }: {
   shopperRef: string;
   config: AdyenHooksConfig;
-  ops: ReturnType<typeof usePaymentOperations>;
   setPage: (p: Page) => void;
 }) {
   const { payments } = usePayments({ shopperReference: shopperRef, config });
@@ -1812,7 +1810,6 @@ function Dashboard({ onBack }: { onBack: () => void }) {
           <OverviewPage
             shopperRef={shopperRef}
             config={hooksConfig}
-            ops={ops}
             setPage={setPage}
           />
         );
