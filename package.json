@@ -1,10 +1,10 @@
 {
   "name": "@abdssamie/adyen-payments",
   "description": "A adyen payments component for Convex.",
-  "repository": "github:Abdssamie/adyen-payments",
-  "homepage": "https://github.com/Abdssamie/adyen-payments#readme",
+  "repository": "git+https://gitlab.com/Abdssamie/adyen-payments.git",
+  "homepage": "https://gitlab.com/Abdssamie/adyen-payments#readme",
   "bugs": {
-    "url": "https://github.com/Abdssamie/adyen-payments/issues"
+    "url": "https://gitlab.com/Abdssamie/adyen-payments/issues"
   },
   "version": "0.1.1",
   "license": "Apache-2.0",
