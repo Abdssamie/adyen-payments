@@ -1,5 +1,6 @@
 import { api } from "../convex/_generated/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { authClient } from "./lib/auth-client";
 import {
   useAdyenShopper,
   useStoredPaymentMethods,
@@ -102,7 +103,19 @@ function Btn({
 // ---------------------------------------------------------------------------
 // Landing — Navbar
 // ---------------------------------------------------------------------------
-function LandingNav({ onEnter }: { onEnter: () => void }) {
+function LandingNav({
+  onEnter,
+  onOpenAuth,
+}: {
+  onEnter: () => void;
+  onOpenAuth: (mode?: "signin" | "signup") => void;
+}) {
+  const { data: session } = authClient.useSession();
+
+  const handleSignOut = async () => {
+    await authClient.signOut();
+  };
+
   return (
     <nav className="landing-nav">
       <div className="landing-nav-brand">
@@ -113,7 +126,6 @@ function LandingNav({ onEnter }: { onEnter: () => void }) {
       <ul className="landing-nav-links">
         <li><a href="#features">Features</a></li>
         <li><a href="#pricing">Pricing</a></li>
-        <li><a href="#demo">Demo</a></li>
         <li>
           <a
             href="https://github.com/get-convex/adyen-payments"
@@ -125,10 +137,33 @@ function LandingNav({ onEnter }: { onEnter: () => void }) {
         </li>
       </ul>
 
-      <div className="landing-nav-actions">
-        <button className="btn btn-primary" id="launch-dashboard-btn" onClick={onEnter}>
-          Launch Dashboard →
-        </button>
+      <div className="landing-nav-actions" style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+        {session?.user ? (
+          <>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 500 }}>
+              Hi, {session.user.name}
+            </span>
+            <button className="btn btn-primary" id="launch-dashboard-btn" onClick={onEnter}>
+              Dashboard →
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={handleSignOut}
+              style={{ color: "var(--red)" }}
+            >
+              Sign Out
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-ghost btn-sm" id="signin-nav-btn" onClick={() => onOpenAuth("signin")}>
+              Sign In
+            </button>
+            <button className="btn btn-primary btn-sm" id="signup-nav-btn" onClick={() => onOpenAuth("signup")}>
+              Sign Up
+            </button>
+          </>
+        )}
       </div>
     </nav>
   );
@@ -353,6 +388,157 @@ function DropinStep({
   );
 }
 
+function AuthForm({
+  onSuccess,
+  initialIsSignUp = false,
+}: {
+  onSuccess: () => void;
+  initialIsSignUp?: boolean;
+}) {
+  const [isSignUp, setIsSignUp] = useState(initialIsSignUp);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!email.trim() || !password.trim() || (isSignUp && !name.trim())) {
+      setError("Please fill in all fields.");
+      return;
+    }
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        const res = await authClient.signUp.email({
+          email,
+          password,
+          name,
+        });
+        if (res.error) {
+          setError(res.error.message || "Failed to sign up.");
+        } else {
+          onSuccess();
+        }
+      } else {
+        const res = await authClient.signIn.email({
+          email,
+          password,
+        });
+        if (res.error) {
+          setError(res.error.message || "Failed to sign in.");
+        } else {
+          onSuccess();
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="auth-form" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      {error && (
+        <div className="error-banner">
+          <span>⚠</span><span>{error}</span>
+        </div>
+      )}
+      {isSignUp && (
+        <div className="field">
+          <label className="field-label">Name</label>
+          <input
+            id="modal-name-input"
+            className="input"
+            placeholder="Jane Doe"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
+      )}
+      <div className="field">
+        <label className="field-label">Email Address</label>
+        <input
+          id="modal-email-input"
+          className="input"
+          type="email"
+          placeholder="jane@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+      </div>
+      <div className="field">
+        <label className="field-label">Password</label>
+        <input
+          id="modal-password-input"
+          className="input"
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+      </div>
+      <button
+        type="submit"
+        className="btn btn-primary btn-full"
+        style={{ marginTop: "0.5rem", display: "flex", justifyContent: "center", alignItems: "center" }}
+        disabled={loading}
+        id="modal-proceed-btn"
+      >
+        {loading ? "Loading..." : (isSignUp ? "Create Account" : "Sign In")}
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        style={{ color: "var(--text-muted)", marginTop: "0.25rem" }}
+        onClick={() => {
+          setIsSignUp(!isSignUp);
+          setError(null);
+        }}
+      >
+        {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
+      </button>
+    </form>
+  );
+}
+
+function AuthModal({
+  mode,
+  onClose,
+  onSuccess,
+}: {
+  mode: "signin" | "signup";
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: "400px" }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">
+              {mode === "signup" ? "Create your account" : "Welcome back"}
+            </div>
+            <div className="modal-subtitle">
+              {mode === "signup" ? "Sign up to access the checkout and dashboard" : "Sign in to access your secure session"}
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="modal-body" style={{ marginTop: "1rem" }}>
+          <AuthForm key={mode} initialIsSignUp={mode === "signup"} onSuccess={onSuccess} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CheckoutModal({
   plan,
   onClose,
@@ -362,12 +548,11 @@ function CheckoutModal({
   onClose: () => void;
   config: AdyenHooksConfig;
 }) {
+  const { data: session } = authClient.useSession();
   const [step, setStep]   = useState<"details" | "payment" | "success" | "error">("details");
-  const [email, setEmail] = useState("");
-  const [name, setName]   = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [session, setSession] = useState<{ sessionId: string; sessionData: string } | null>(null);
+  const [checkoutSession, setCheckoutSession] = useState<{ sessionId: string; sessionData: string } | null>(null);
   const [resultCode, setResultCode] = useState<string | null>(null);
   const ops = usePaymentOperations(config);
 
@@ -378,18 +563,18 @@ function CheckoutModal({
   const meta = planMeta[plan];
 
   const handleProceed = async () => {
-    if (!email.trim()) { setError("Please enter your email address."); return; }
+    if (!session?.user) return;
     setError(null);
     setLoading(true);
     try {
-      const shopperRef = `pricing_${email.replace(/[^a-z0-9]/gi, "_")}`;
+      const shopperRef = session.user.id;
       const result = await ops.createCheckoutSession({
         amount: meta.amount,
         currency: meta.currency,
         shopperReference: shopperRef,
       });
       if (result?.sessionId && result?.sessionData) {
-        setSession({ sessionId: result.sessionId, sessionData: result.sessionData });
+        setCheckoutSession({ sessionId: result.sessionId, sessionData: result.sessionData });
         setStep("payment");
       } else {
         setError("Could not create a checkout session. Check your Adyen configuration.");
@@ -439,54 +624,48 @@ function CheckoutModal({
           {/* ── Step 1: details ── */}
           {step === "details" && (
             <>
-              {error && (
-                <div className="error-banner" style={{ marginBottom: "1.25rem" }}>
-                  <span>⚠</span><span>{error}</span>
-                </div>
+              {session?.user ? (
+                <>
+                  {error && (
+                    <div className="error-banner" style={{ marginBottom: "1.25rem" }}>
+                      <span>⚠</span><span>{error}</span>
+                    </div>
+                  )}
+                  <div style={{ padding: "1rem", borderRadius: "8px", background: "var(--bg-secondary)", border: "1px solid var(--border)", marginBottom: "1.25rem" }}>
+                    <div style={{ fontWeight: "600", fontSize: "0.85rem", color: "var(--text-secondary)" }}>Logged in as:</div>
+                    <div style={{ color: "var(--text-primary)", fontWeight: "600", fontSize: "1.05rem", marginTop: "0.25rem" }}>{session.user.name}</div>
+                    <div style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>{session.user.email}</div>
+                  </div>
+                  <div className="modal-redirect-note">
+                    <span>🔒</span>
+                    Your payment is processed securely by Adyen. Card details never touch our servers.
+                  </div>
+                  <Btn
+                    id="modal-proceed-btn"
+                    className="btn btn-primary btn-full"
+                    style={{ marginTop: "1.25rem" }}
+                    loading={loading}
+                    onClick={handleProceed}
+                  >
+                    {plan === "starter" ? "Activate Free Plan →" : "Continue to Payment →"}
+                  </Btn>
+                </>
+              ) : (
+                <>
+                  <div style={{ textAlign: "center", marginBottom: "1.25rem", color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+                    Please sign in or create an account to activate the plan.
+                  </div>
+                  <AuthForm onSuccess={() => {}} />
+                </>
               )}
-              <div className="field">
-                <label className="field-label">Your Name</label>
-                <input
-                  id="modal-name-input"
-                  className="input"
-                  placeholder="Jane Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label className="field-label">Email Address</label>
-                <input
-                  id="modal-email-input"
-                  className="input"
-                  type="email"
-                  placeholder="jane@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleProceed()}
-                />
-              </div>
-              <div className="modal-redirect-note">
-                <span>🔒</span>
-                Your payment is processed securely by Adyen. Card details never touch our servers.
-              </div>
-              <Btn
-                id="modal-proceed-btn"
-                className="btn btn-primary btn-full"
-                style={{ marginTop: "1.25rem" }}
-                loading={loading}
-                onClick={handleProceed}
-              >
-                {plan === "starter" ? "Activate Free Plan →" : "Continue to Payment →"}
-              </Btn>
             </>
           )}
 
           {/* ── Step 2: Drop-in ── */}
-          {step === "payment" && session && (
+          {step === "payment" && checkoutSession && (
             <DropinStep
-              sessionId={session.sessionId}
-              sessionData={session.sessionData}
+              sessionId={checkoutSession.sessionId}
+              sessionData={checkoutSession.sessionData}
               currency={meta.currency}
               onDone={handlePaymentDone}
               onError={handlePaymentError}
@@ -499,7 +678,7 @@ function CheckoutModal({
               <div className="modal-success-icon">✓</div>
               <div className="modal-success-title">You're all set!</div>
               <div className="modal-success-desc">
-                Payment {resultCode?.toLowerCase()}. Welcome to the <strong>{meta.label}</strong> plan, {name || email}!
+                Payment {resultCode?.toLowerCase()}. Welcome to the <strong>{meta.label}</strong> plan, {session?.user?.name || session?.user?.email}!
               </div>
               <button className="btn btn-primary btn-full" style={{ marginTop: "1.5rem" }} onClick={onClose}>
                 Go to dashboard →
@@ -511,11 +690,11 @@ function CheckoutModal({
           {step === "error" && (
             <div className="modal-success" style={{ paddingBottom: "0.5rem" }}>
               <div className="modal-success-icon" style={{ background: "var(--red-light)", borderColor: "var(--red-border)", color: "var(--red)" }}>✕</div>
-              <div className="modal-success-title" style={{ color: "var(--red)" }}>Payment {resultCode ?? "failed"}</div>
-              <div className="modal-success-desc">{error ?? "The payment could not be processed. Please try a different card."}</div>
+              <div className="modal-title" style={{ color: "var(--red)", marginTop: "1rem" }}>Payment {resultCode ?? "failed"}</div>
+              <div className="modal-success-desc" style={{ marginTop: "0.5rem" }}>{error ?? "The payment could not be processed. Please try a different card."}</div>
               <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
                 <button className="btn btn-ghost btn-full" onClick={onClose}>Cancel</button>
-                <button className="btn btn-primary btn-full" onClick={() => { setStep("details"); setError(null); setSession(null); }}>Try again</button>
+                <button className="btn btn-primary btn-full" onClick={() => { setStep("details"); setError(null); setCheckoutSession(null); }}>Try again</button>
               </div>
             </div>
           )}
@@ -701,7 +880,13 @@ function Sidebar({
   setPage: (p: Page) => void;
   onBack: () => void;
 }) {
+  const { data: session } = authClient.useSession();
   const groups = Array.from(new Set(NAV_ITEMS.map((i) => i.group)));
+
+  const handleSignOut = async () => {
+    await authClient.signOut();
+    onBack();
+  };
 
   return (
     <aside className="sidebar">
@@ -751,15 +936,26 @@ function Sidebar({
         </div>
       </nav>
 
-      <div className="sidebar-footer">
-        <div className="sidebar-user">
-          <div className="user-avatar">A</div>
-          <div>
-            <div className="user-name">Admin User</div>
-            <div className="user-role" style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-              Administrator
+      <div className="sidebar-footer" style={{ borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
+        <div className="sidebar-user" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+            <div className="user-avatar">{session?.user?.name?.[0]?.toUpperCase() || "U"}</div>
+            <div style={{ minWidth: 0 }}>
+              <div className="user-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {session?.user?.name || "User"}
+              </div>
+              <div className="user-role" style={{ fontSize: "0.7rem", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {session?.user?.email}
+              </div>
             </div>
           </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={handleSignOut}
+            style={{ padding: "4px 8px", fontSize: "0.75rem", color: "var(--red)", flexShrink: 0 }}
+          >
+            Sign Out
+          </button>
         </div>
       </div>
     </aside>
@@ -1753,10 +1949,16 @@ function TransactionsPage({
 // ---------------------------------------------------------------------------
 // Landing Page (full)
 // ---------------------------------------------------------------------------
-function LandingPage({ onEnter }: { onEnter: () => void }) {
+function LandingPage({
+  onEnter,
+  onOpenAuth,
+}: {
+  onEnter: () => void;
+  onOpenAuth: (mode?: "signin" | "signup") => void;
+}) {
   return (
     <div className="landing-page">
-      <LandingNav onEnter={onEnter} />
+      <LandingNav onEnter={onEnter} onOpenAuth={onOpenAuth} />
       <Hero onEnter={onEnter} />
       <FeaturesSection />
       <PricingSection config={hooksConfig} />
@@ -1796,10 +1998,21 @@ function LandingPage({ onEnter }: { onEnter: () => void }) {
 // Dashboard (full)
 // ---------------------------------------------------------------------------
 function Dashboard({ onBack }: { onBack: () => void }) {
+  const { data: session } = authClient.useSession();
   const [page, setPage]           = useState<Page>("overview");
-  const [shopperRef, setShopperRef] = useState("test_shopper_1");
-  const [email, setEmail]           = useState("test@example.com");
-  const [name, setName]             = useState("Test Shopper");
+
+  // Derive shopper info from Better Auth session
+  const shopperRef = session?.user?.id || "guest_shopper";
+  const email = session?.user?.email || "guest@example.com";
+  const name = session?.user?.name || "Guest";
+
+  // Auto-sync the logged in user as a shopper in Adyen when accessing dashboard
+  const { register } = useAdyenShopper({ shopperReference: shopperRef, config: hooksConfig });
+  useEffect(() => {
+    if (session?.user) {
+      register({ userId: shopperRef, email, name }).catch(() => undefined);
+    }
+  }, [session, shopperRef, email, name, register]);
 
   const ops = usePaymentOperations(hooksConfig);
 
@@ -1817,11 +2030,11 @@ function Dashboard({ onBack }: { onBack: () => void }) {
         return (
           <ShopperPage
             shopperRef={shopperRef}
-            setShopperRef={setShopperRef}
+            setShopperRef={() => {}}
             email={email}
-            setEmail={setEmail}
+            setEmail={() => {}}
             name={name}
-            setName={setName}
+            setName={() => {}}
             config={hooksConfig}
           />
         );
@@ -1864,13 +2077,36 @@ function Dashboard({ onBack }: { onBack: () => void }) {
 // ---------------------------------------------------------------------------
 export default function App() {
   const [view, setView] = useState<"landing" | "dashboard">("landing");
+  const { data: session } = authClient.useSession();
+  const [authModalMode, setAuthModalMode] = useState<"signin" | "signup" | null>(null);
+
+  const handleEnterDashboard = () => {
+    if (session?.user) {
+      setView("dashboard");
+    } else {
+      setAuthModalMode("signin");
+    }
+  };
 
   return (
     <div className="app-shell">
       {view === "landing" ? (
-        <LandingPage onEnter={() => setView("dashboard")} />
+        <LandingPage
+          onEnter={handleEnterDashboard}
+          onOpenAuth={(mode) => setAuthModalMode(mode || "signin")}
+        />
       ) : (
         <Dashboard onBack={() => setView("landing")} />
+      )}
+      {authModalMode !== null && (
+        <AuthModal
+          mode={authModalMode}
+          onClose={() => setAuthModalMode(null)}
+          onSuccess={() => {
+            setAuthModalMode(null);
+            setView("dashboard");
+          }}
+        />
       )}
     </div>
   );

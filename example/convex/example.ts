@@ -25,11 +25,14 @@ export const getOrCreateShopper = action({
     email: v.optional(v.string()),
     name: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     const identity = await ctx.auth.getUserIdentity();
-    const userId = args.userId ?? identity?.subject ?? "guest_shopper_1";
-    const email = args.email ?? identity?.email ?? (userId === "guest_shopper_1" ? "guest@example.com" : undefined);
-    const name = args.name ?? identity?.name ?? (userId === "guest_shopper_1" ? "Guest Shopper" : undefined);
+    if (!identity) {
+      throw new Error("Unauthenticated");
+    }
+    const userId = identity.subject;
+    const email = identity.email;
+    const name = identity.name;
 
     return await adyenClient.getOrCreateShopper(ctx, {
       userId,
@@ -49,12 +52,15 @@ export const createCheckout = action({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    const shopperReference = args.shopperReference ?? identity?.subject ?? "guest_shopper_1";
+    if (!identity) {
+      throw new Error("Unauthenticated");
+    }
+    const shopperReference = identity.subject;
 
     const shopperResult = await adyenClient.getOrCreateShopper(ctx, {
       userId: shopperReference,
-      email: identity?.email ?? (shopperReference === "guest_shopper_1" ? "guest@example.com" : undefined),
-      name: identity?.name ?? (shopperReference === "guest_shopper_1" ? "Guest Shopper" : undefined),
+      email: identity.email,
+      name: identity.name,
     });
 
     return await adyenClient.createCheckoutSession(ctx, {
@@ -73,9 +79,13 @@ export const syncPaymentMethods = action({
   args: {
     shopperReference: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated");
+    }
     return await adyenClient.listStoredPaymentMethods(ctx, {
-      shopperReference: args.shopperReference,
+      shopperReference: identity.subject,
     });
   },
 });
@@ -87,8 +97,12 @@ export const deletePaymentMethod = action({
     recurringDetailReference: v.string(),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated");
+    }
     return await adyenClient.deleteStoredPaymentMethod(ctx, {
-      shopperReference: args.shopperReference,
+      shopperReference: identity.subject,
       recurringDetailReference: args.recurringDetailReference,
     });
   },
@@ -104,8 +118,12 @@ export const chargeCard = action({
     autoCapture: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated");
+    }
     return await adyenClient.chargeStoredCard(ctx, {
-      shopperReference: args.shopperReference,
+      shopperReference: identity.subject,
       recurringDetailReference: args.recurringDetailReference,
       amount: args.amount,
       currency: args.currency,

@@ -14,6 +14,12 @@ importers:
       '@adyen/api-library':
         specifier: ^22.0.0
         version: 22.1.0
+      '@convex-dev/better-auth':
+        specifier: ^0.12.4
+        version: 0.12.4(@standard-schema/spec@1.1.0)(better-auth@1.6.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.4(@edge-runtime/vm@5.0.0)(@types/node@24.13.2)(vite@8.0.9(@types/node@24.13.2)(esbuild@0.27.0))))(convex@1.41.0(react@19.2.7))(react@19.2.7)(typescript@6.0.3)
+      better-auth:
+        specifier: ^1.6.20
+        version: 1.6.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.4(@edge-runtime/vm@5.0.0)(@types/node@24.13.2)(vite@8.0.9(@types/node@24.13.2)(esbuild@0.27.0)))
     devDependencies:
       '@convex-dev/eslint-plugin':
         specifier: ^2.0.0
@@ -178,6 +184,92 @@ packages:
   '@babel/types@7.29.7':
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
+
+  '@better-auth/core@1.6.20':
+    resolution: {integrity: sha512-y73I1xNXuNYiHBFduWGRcJ2ro2rNuVDEYkgVMJtIaRXtbosdXHs9gfyQrHecgeHMHKx1SYSBT/CExak0vVMTng==}
+    peerDependencies:
+      '@better-auth/utils': 0.4.2
+      '@better-fetch/fetch': 1.3.1
+      '@cloudflare/workers-types': '>=4'
+      '@opentelemetry/api': ^1.9.0
+      better-call: 1.3.6
+      jose: ^6.1.0
+      kysely: ^0.28.5 || ^0.29.0
+      nanostores: ^1.0.1
+    peerDependenciesMeta:
+      '@cloudflare/workers-types':
+        optional: true
+      '@opentelemetry/api':
+        optional: true
+
+  '@better-auth/drizzle-adapter@1.6.20':
+    resolution: {integrity: sha512-hJHfCdAiZrC7EmZAt3NAiGgcNo9Y5Qz3PLL+a9rODXaAJGCMvzUJniqef9wHuJBwU0SWW+2f4wXe8xQmaC/IKQ==}
+    peerDependencies:
+      '@better-auth/core': ^1.6.20
+      '@better-auth/utils': 0.4.2
+      drizzle-orm: ^0.45.2
+    peerDependenciesMeta:
+      drizzle-orm:
+        optional: true
+
+  '@better-auth/kysely-adapter@1.6.20':
+    resolution: {integrity: sha512-Uvpmgbx5y8JqXroVanNzDdKzOl3HojoTz+/X6MR6zOUr25IzlYz660mjnu0rxKiIF55kD3CroqFsDzjNUw7ERw==}
+    peerDependencies:
+      '@better-auth/core': ^1.6.20
+      '@better-auth/utils': 0.4.2
+      kysely: ^0.28.17 || ^0.29.0
+    peerDependenciesMeta:
+      kysely:
+        optional: true
+
+  '@better-auth/memory-adapter@1.6.20':
+    resolution: {integrity: sha512-J5Ni0LlFijbzXlwu2rFHaD8zEFocmajyzWkRnHsq8LhV/Dk4iWQwwnqzLrPoDQEj8roECAUF03hrIeMzqWRqJQ==}
+    peerDependencies:
+      '@better-auth/core': ^1.6.20
+      '@better-auth/utils': 0.4.2
+
+  '@better-auth/mongo-adapter@1.6.20':
+    resolution: {integrity: sha512-ClDBJf6h4g85WJswxwQwxLaiyRU67Gmz/uaIf19tY1gqlLJDykSGjmqRNSBMG5rWABNzcNqbO4KG31rYUldbIw==}
+    peerDependencies:
+      '@better-auth/core': ^1.6.20
+      '@better-auth/utils': 0.4.2
+      mongodb: ^6.0.0 || ^7.0.0
+    peerDependenciesMeta:
+      mongodb:
+        optional: true
+
+  '@better-auth/prisma-adapter@1.6.20':
+    resolution: {integrity: sha512-WhYdhSGuVSfu1peCSf2snmmVzfWjRaEvbSrsNCusiwGE9l94HlES4mjSPM48fed24hL7yg4j1dYK/yjEt87FpQ==}
+    peerDependencies:
+      '@better-auth/core': ^1.6.20
+      '@better-auth/utils': 0.4.2
+      '@prisma/client': ^5.0.0 || ^6.0.0 || ^7.0.0
+      prisma: ^5.0.0 || ^6.0.0 || ^7.0.0
+    peerDependenciesMeta:
+      '@prisma/client':
+        optional: true
+      prisma:
+        optional: true
+
+  '@better-auth/telemetry@1.6.20':
+    resolution: {integrity: sha512-3BhbY3naQDERvdJvJ7fGszVY6rpsVfc6c9uyBVZlC1coVEF/rkM0rIcjtMVI1GUH7vWy1wjR6qF5vQnMun3XNQ==}
+    peerDependencies:
+      '@better-auth/core': ^1.6.20
+      '@better-auth/utils': 0.4.2
+      '@better-fetch/fetch': 1.3.1
+
+  '@better-auth/utils@0.4.2':
+    resolution: {integrity: sha512-AUxrvu+HaaODsUyzDxFgwd/8RZ1yZaYo42LXKSrU2oGgR38pS1ij8nqQKNgtTWoYGpNevNXtCfgTy6loHveW9A==}
+
+  '@better-fetch/fetch@1.3.1':
+    resolution: {integrity: sha512-ABkD1WhyfPZprKRQI3bhATjeiFuNWC9PXhfGWqL+sg/gKrM977oFrYkdb4msM3hgUGonr7KlOsOFT5TU2rht9g==}
+
+  '@convex-dev/better-auth@0.12.4':
+    resolution: {integrity: sha512-N3DsrVZAScy9QECP/E9LjpwA0CehT7lFjFGT68kOHwAcrfYnwSML2tqQS8hpIbTkzvaz11+pJMirUmWkZt1Nog==}
+    peerDependencies:
+      better-auth: '>=1.6.11 <1.7.0'
+      convex: ^1.25.0
+      react: ^18.3.1 || ^19.0.0
 
   '@convex-dev/eslint-plugin@2.0.0':
     resolution: {integrity: sha512-GxYe0b5RoAb7c7JzcAX3t+UrdT6edQDtSgJ2F9UPECLyQGU0TeTkyGsDXNm3HK+MnWYi8isRlqaqoYTUD0Ko+Q==}
@@ -441,6 +533,14 @@ packages:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
 
+  '@noble/ciphers@2.2.0':
+    resolution: {integrity: sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/hashes@2.2.0':
+    resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
+    engines: {node: '>= 20.19.0'}
+
   '@octokit/action@6.1.0':
     resolution: {integrity: sha512-lo+nHx8kAV86bxvOVOI3vFjX3gXPd/L7guAUbvs3pUvnR2KC+R7yjBkA1uACt4gYhs4LcWP3AXSGQzsbeN2XXw==}
     engines: {node: '>= 18'}
@@ -496,6 +596,10 @@ packages:
 
   '@octokit/types@13.10.0':
     resolution: {integrity: sha512-ifLaO34EbbPj0Xgro4G5lP5asESjwHracYJvVaPIyXMuiuXLlhic3S47cBdTb+jfODkTE5YtGCLt3Ay3+J97sA==}
+
+  '@opentelemetry/semantic-conventions@1.41.1':
+    resolution: {integrity: sha512-/UhIkaZgPutTFmQ7RnIJGgDXZmtEJ7Dvi86xNTFWcnRxVRNk/aotsqDJYeEvDP+FSMB2SdW+pQzNMcWP0rwuNA==}
+    engines: {node: '>=14'}
 
   '@oxc-project/types@0.126.0':
     resolution: {integrity: sha512-oGfVtjAgwQVVpfBrbtk4e1XDyWHRFta6BS3GWVzrF8xYBT2VGQAk39yJS/wFSMrZqoiCU4oghT3Ch0HaHGIHcQ==}
@@ -881,6 +985,76 @@ packages:
   before-after-hook@2.2.3:
     resolution: {integrity: sha512-NzUnlZexiaH/46WDhANlyR2bXRopNg4F/zuSA3OpZnllCUgRaOF2znDioDWrmbNVsuZk6l9pMquQB38cfBZwkQ==}
 
+  better-auth@1.6.20:
+    resolution: {integrity: sha512-fSpGHGRKiGRiYVd3QTQtuVZ8oxpiSe/7ip0Rpvt/Sy8zQbEbVKUPMOhE0gLXg+FjqTUsIo7582hxUYxtEcqUpA==}
+    peerDependencies:
+      '@lynx-js/react': '*'
+      '@prisma/client': ^5.0.0 || ^6.0.0 || ^7.0.0
+      '@sveltejs/kit': ^2.0.0
+      '@tanstack/react-start': ^1.0.0
+      '@tanstack/solid-start': ^1.0.0
+      better-sqlite3: ^12.0.0
+      drizzle-kit: '>=0.31.4'
+      drizzle-orm: ^0.45.2
+      mongodb: ^6.0.0 || ^7.0.0
+      mysql2: ^3.0.0
+      next: ^14.0.0 || ^15.0.0 || ^16.0.0
+      pg: ^8.0.0
+      prisma: ^5.0.0 || ^6.0.0 || ^7.0.0
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
+      solid-js: ^1.0.0
+      svelte: ^4.0.0 || ^5.0.0
+      vitest: ^2.0.0 || ^3.0.0 || ^4.0.0
+      vue: ^3.0.0
+    peerDependenciesMeta:
+      '@lynx-js/react':
+        optional: true
+      '@prisma/client':
+        optional: true
+      '@sveltejs/kit':
+        optional: true
+      '@tanstack/react-start':
+        optional: true
+      '@tanstack/solid-start':
+        optional: true
+      better-sqlite3:
+        optional: true
+      drizzle-kit:
+        optional: true
+      drizzle-orm:
+        optional: true
+      mongodb:
+        optional: true
+      mysql2:
+        optional: true
+      next:
+        optional: true
+      pg:
+        optional: true
+      prisma:
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
+      solid-js:
+        optional: true
+      svelte:
+        optional: true
+      vitest:
+        optional: true
+      vue:
+        optional: true
+
+  better-call@1.3.6:
+    resolution: {integrity: sha512-no1jI+h6Bkxs1NVBo4rONbVIzsPjZ8IUu7IHaJBiFwVX1XEQGN8KpHots5fSWmXe9nNyLuLIcgx6WEUcE6EDaA==}
+    peerDependencies:
+      zod: ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+
   binary-extensions@2.3.0:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
     engines: {node: '>=8'}
@@ -963,6 +1137,10 @@ packages:
   color-name@1.1.4:
     resolution: {integrity: sha512-dOy+3AuW3a2wNbZHIuMZpTcgjGuLU/uBL/ubcZF9OXbDo8ff4O8yVp5Bf0efS8uEoYo5q4Fx7dY9OgQGXgAsQA==}
 
+  common-tags@1.8.2:
+    resolution: {integrity: sha512-gk/Z852D2Wtb//0I+kRFNKKE9dIIVirjoqPoA1wJU+XePVXZfGeBpk45+A1rKO4Q43prqWBNY/MiIeRLbPWUaA==}
+    engines: {node: '>=4.0.0'}
+
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
 
@@ -971,6 +1149,28 @@ packages:
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  convex-helpers@0.1.120:
+    resolution: {integrity: sha512-FPqtmN/10uoxmmhVq0ViNi08AnmHKT/eU1R8+ohmPZoHfg8noZEZCltApY/ASDdhq92o0kLZETggzBvMfHJDLQ==}
+    hasBin: true
+    peerDependencies:
+      '@standard-schema/spec': ^1.0.0
+      convex: ^1.32.0
+      hono: ^4.0.5
+      react: ^17.0.2 || ^18.0.0 || ^19.0.0
+      typescript: ^5.5 || ^6.0.0
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@standard-schema/spec':
+        optional: true
+      hono:
+        optional: true
+      react:
+        optional: true
+      typescript:
+        optional: true
+      zod:
+        optional: true
 
   convex-test@0.0.49:
     resolution: {integrity: sha512-mBDhwvxUZYtRuEx4a9opk7LI6IghcPOHd99QVPAzMugeYeAukLjkFkkkAU9J53edxxwGWfx1IsoKLzC+DK6ugg==}
@@ -1042,6 +1242,9 @@ packages:
   define-properties@1.2.1:
     resolution: {integrity: sha512-8QmQKqEASLd5nx0U1B1okLElbUuuttJ/AnYmRXbbbGDWh6uS208EjD4Xqq/I9wK7u0v6O08XhTWnt5XtEbR6Dg==}
     engines: {node: '>= 0.4'}
+
+  defu@6.1.7:
+    resolution: {integrity: sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ==}
 
   deprecation@2.3.1:
     resolution: {integrity: sha512-xmHIy4F3scKVwMsQ4WnVaS8bHOx0DmVwRywosKhaILI0ywMDWPtBSku2HNxRvF7jtwDRsoEwYQSfbxj8b7RlJQ==}
@@ -1477,6 +1680,9 @@ packages:
     resolution: {integrity: sha512-H0dkQoCa3b2VEeKQBOxFph+JAbcrQdE7KC0UkqwpLmv2EC4P41QXP+rqo9wYodACiG5/WM5s9oDApTU8utwj9g==}
     engines: {node: '>= 0.4'}
 
+  jose@6.2.3:
+    resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -1509,6 +1715,10 @@ packages:
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
+
+  kysely@0.29.2:
+    resolution: {integrity: sha512-s6WVJyEZrbm6jhBpiKHsGHyePMrVQKJ85wZCFCr9W4QHv6WTjWIrdvTmO9hDEA3bNK0xkrE2DqrHsXMLWuZpQg==}
+    engines: {node: '>=22.0.0'}
 
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
@@ -1636,6 +1846,10 @@ packages:
     resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
+
+  nanostores@1.3.0:
+    resolution: {integrity: sha512-XPUa/jz+P1oJvN9VBxw4L9MtdFfaH3DAryqPssqhb2kXjmb9npz0dly6rCsgFWOPr4Yg9mTfM3MDZgZZ+7A3lA==}
+    engines: {node: ^20.0.0 || >=22.0.0}
 
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
@@ -1821,6 +2035,10 @@ packages:
     resolution: {integrity: sha512-dYqgNSZbDwkaJ2ceRd9ojCGjBq+mOm9LmtXnAnEGyHhN/5R7iDW2TRw3h+o/jCFxus3P2LfWIIiwowAjANm7IA==}
     engines: {node: '>= 0.4'}
 
+  remeda@2.39.0:
+    resolution: {integrity: sha512-3Ki8dU1o3OVu4dwIQ2Pj+yiuP7OnEbmWAGmJ3yDRqopily5jsj8NWzPvbS89H85d6UdONKEcUnrfuHY6jN9vyw==}
+    engines: {node: '>=18.0.0'}
+
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
@@ -1841,6 +2059,9 @@ packages:
     resolution: {integrity: sha512-rzi5WqKzEZw3SooTt7cgm4eqIoujPIyGcJNGFL7iPEuajQw7vxMHUkXylu4/vhCkJGXsgRmxqMKXUpT6FEgl0g==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
+
+  rou3@0.7.12:
+    resolution: {integrity: sha512-iFE4hLDuloSWcD7mjdCDhx2bKcIsYbtOTpfH5MHHLSKMOUyjqQXTeZVa289uuwEGEKFoE/BAPbhaU4B774nceg==}
 
   safe-array-concat@1.1.4:
     resolution: {integrity: sha512-wtZlHyOje6OZTGqAoaDKxFkgRtkF9CnHAVnCHKfuj200wAgL+bSJhdsCD2l0Qx/2ekEXjPWcyKkfGb5CPboslg==}
@@ -1868,6 +2089,9 @@ packages:
 
   set-blocking@2.0.0:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
+
+  set-cookie-parser@3.1.0:
+    resolution: {integrity: sha512-kjnC1DXBHcxaOaOXBHBeRtltsDG2nUiUni+jP92M9gYdW12rsmx92UsfpH7o5tDRs7I1ZZPSQJQGv3UaRfCiuw==}
 
   set-function-length@1.2.2:
     resolution: {integrity: sha512-pgRc4hJ4/sNjWCSS9AmnS40x3bNMDTknHgL5UaMBTMyJnU90EgWh1Rz+MC9eFu4BuN/UwZjKQuY/1v3rM7HMfg==}
@@ -1969,6 +2193,10 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
+  tagged-tag@1.0.0:
+    resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
+    engines: {node: '>=20'}
+
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
@@ -2008,6 +2236,10 @@ packages:
   type-detect@4.1.0:
     resolution: {integrity: sha512-Acylog8/luQ8L7il+geoSxhEkazvkslg7PSNKOX59mbB9cOveP5aq9h74Y7YU8yDpJwetzQQrfIwtf4Wp4LKcw==}
     engines: {node: '>=4'}
+
+  type-fest@5.7.0:
+    resolution: {integrity: sha512-1URUxUqfHFM1c+zfSPsa3gnkO7Aq21qyH75SIduNYz4SzY964rn1X2vCMQaHSHhktiw+0kPa2iyb6PUpXqB6Vg==}
+    engines: {node: '>=20'}
 
   typed-array-buffer@1.0.3:
     resolution: {integrity: sha512-nAYYwfY3qnzX30IkA6AQZjVbtK6duGontcQm1WSG1MD94YLqK0515GNApXkoxKOWMusVssAHWLh9SeaoefYFGw==}
@@ -2373,6 +2605,75 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
+  '@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0)':
+    dependencies:
+      '@better-auth/utils': 0.4.2
+      '@better-fetch/fetch': 1.3.1
+      '@opentelemetry/semantic-conventions': 1.41.1
+      '@standard-schema/spec': 1.1.0
+      better-call: 1.3.6(zod@4.4.3)
+      jose: 6.2.3
+      kysely: 0.29.2
+      nanostores: 1.3.0
+      zod: 4.4.3
+
+  '@better-auth/drizzle-adapter@1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)':
+    dependencies:
+      '@better-auth/core': 1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0)
+      '@better-auth/utils': 0.4.2
+
+  '@better-auth/kysely-adapter@1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)(kysely@0.29.2)':
+    dependencies:
+      '@better-auth/core': 1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0)
+      '@better-auth/utils': 0.4.2
+    optionalDependencies:
+      kysely: 0.29.2
+
+  '@better-auth/memory-adapter@1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)':
+    dependencies:
+      '@better-auth/core': 1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0)
+      '@better-auth/utils': 0.4.2
+
+  '@better-auth/mongo-adapter@1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)':
+    dependencies:
+      '@better-auth/core': 1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0)
+      '@better-auth/utils': 0.4.2
+
+  '@better-auth/prisma-adapter@1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)':
+    dependencies:
+      '@better-auth/core': 1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0)
+      '@better-auth/utils': 0.4.2
+
+  '@better-auth/telemetry@1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)':
+    dependencies:
+      '@better-auth/core': 1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0)
+      '@better-auth/utils': 0.4.2
+      '@better-fetch/fetch': 1.3.1
+
+  '@better-auth/utils@0.4.2':
+    dependencies:
+      '@noble/hashes': 2.2.0
+
+  '@better-fetch/fetch@1.3.1': {}
+
+  '@convex-dev/better-auth@0.12.4(@standard-schema/spec@1.1.0)(better-auth@1.6.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.4(@edge-runtime/vm@5.0.0)(@types/node@24.13.2)(vite@8.0.9(@types/node@24.13.2)(esbuild@0.27.0))))(convex@1.41.0(react@19.2.7))(react@19.2.7)(typescript@6.0.3)':
+    dependencies:
+      '@better-fetch/fetch': 1.3.1
+      better-auth: 1.6.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.4(@edge-runtime/vm@5.0.0)(@types/node@24.13.2)(vite@8.0.9(@types/node@24.13.2)(esbuild@0.27.0)))
+      common-tags: 1.8.2
+      convex: 1.41.0(react@19.2.7)
+      convex-helpers: 0.1.120(@standard-schema/spec@1.1.0)(convex@1.41.0(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.4.3)
+      jose: 6.2.3
+      react: 19.2.7
+      remeda: 2.39.0
+      semver: 7.8.4
+      type-fest: 5.7.0
+      zod: 4.4.3
+    transitivePeerDependencies:
+      - '@standard-schema/spec'
+      - hono
+      - typescript
+
   '@convex-dev/eslint-plugin@2.0.0(convex@1.41.0(react@19.2.7))(eslint@9.39.4)(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/types': 8.58.2
@@ -2578,6 +2879,10 @@ snapshots:
       '@tybys/wasm-util': 0.10.2
     optional: true
 
+  '@noble/ciphers@2.2.0': {}
+
+  '@noble/hashes@2.2.0': {}
+
   '@octokit/action@6.1.0':
     dependencies:
       '@octokit/auth-action': 4.1.0
@@ -2649,6 +2954,8 @@ snapshots:
   '@octokit/types@13.10.0':
     dependencies:
       '@octokit/openapi-types': 24.2.0
+
+  '@opentelemetry/semantic-conventions@1.41.1': {}
 
   '@oxc-project/types@0.126.0': {}
 
@@ -3023,6 +3330,42 @@ snapshots:
 
   before-after-hook@2.2.3: {}
 
+  better-auth@1.6.20(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vitest@4.1.4(@edge-runtime/vm@5.0.0)(@types/node@24.13.2)(vite@8.0.9(@types/node@24.13.2)(esbuild@0.27.0))):
+    dependencies:
+      '@better-auth/core': 1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0)
+      '@better-auth/drizzle-adapter': 1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)
+      '@better-auth/kysely-adapter': 1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)(kysely@0.29.2)
+      '@better-auth/memory-adapter': 1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)
+      '@better-auth/mongo-adapter': 1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)
+      '@better-auth/prisma-adapter': 1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)
+      '@better-auth/telemetry': 1.6.20(@better-auth/core@1.6.20(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(better-call@1.3.6(zod@4.4.3))(jose@6.2.3)(kysely@0.29.2)(nanostores@1.3.0))(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)
+      '@better-auth/utils': 0.4.2
+      '@better-fetch/fetch': 1.3.1
+      '@noble/ciphers': 2.2.0
+      '@noble/hashes': 2.2.0
+      better-call: 1.3.6(zod@4.4.3)
+      defu: 6.1.7
+      jose: 6.2.3
+      kysely: 0.29.2
+      nanostores: 1.3.0
+      zod: 4.4.3
+    optionalDependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      vitest: 4.1.4(@edge-runtime/vm@5.0.0)(@types/node@24.13.2)(vite@8.0.9(@types/node@24.13.2)(esbuild@0.27.0))
+    transitivePeerDependencies:
+      - '@cloudflare/workers-types'
+      - '@opentelemetry/api'
+
+  better-call@1.3.6(zod@4.4.3):
+    dependencies:
+      '@better-auth/utils': 0.4.2
+      '@better-fetch/fetch': 1.3.1
+      rou3: 0.7.12
+      set-cookie-parser: 3.1.0
+    optionalDependencies:
+      zod: 4.4.3
+
   binary-extensions@2.3.0: {}
 
   brace-expansion@1.1.15:
@@ -3117,11 +3460,22 @@ snapshots:
 
   color-name@1.1.4: {}
 
+  common-tags@1.8.2: {}
+
   concat-map@0.0.1: {}
 
   confbox@0.1.8: {}
 
   convert-source-map@2.0.0: {}
+
+  convex-helpers@0.1.120(@standard-schema/spec@1.1.0)(convex@1.41.0(react@19.2.7))(react@19.2.7)(typescript@6.0.3)(zod@4.4.3):
+    dependencies:
+      convex: 1.41.0(react@19.2.7)
+    optionalDependencies:
+      '@standard-schema/spec': 1.1.0
+      react: 19.2.7
+      typescript: 6.0.3
+      zod: 4.4.3
 
   convex-test@0.0.49(convex@1.41.0(react@19.2.7)):
     dependencies:
@@ -3185,6 +3539,8 @@ snapshots:
       define-data-property: 1.1.4
       has-property-descriptors: 1.0.2
       object-keys: 1.1.1
+
+  defu@6.1.7: {}
 
   deprecation@2.3.1: {}
 
@@ -3744,6 +4100,8 @@ snapshots:
       has-symbols: 1.1.0
       set-function-name: 2.0.2
 
+  jose@6.2.3: {}
+
   js-tokens@4.0.0: {}
 
   js-yaml@4.2.0:
@@ -3770,6 +4128,8 @@ snapshots:
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
+
+  kysely@0.29.2: {}
 
   levn@0.4.1:
     dependencies:
@@ -3872,6 +4232,8 @@ snapshots:
   ms@2.1.3: {}
 
   nanoid@3.3.12: {}
+
+  nanostores@1.3.0: {}
 
   natural-compare@1.4.0: {}
 
@@ -4072,6 +4434,8 @@ snapshots:
       gopd: 1.2.0
       set-function-name: 2.0.2
 
+  remeda@2.39.0: {}
+
   require-directory@2.1.1: {}
 
   require-main-filename@2.0.0: {}
@@ -4108,6 +4472,8 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.0.0-rc.16
       '@rolldown/binding-win32-x64-msvc': 1.0.0-rc.16
 
+  rou3@0.7.12: {}
+
   safe-array-concat@1.1.4:
     dependencies:
       call-bind: 1.0.9
@@ -4134,6 +4500,8 @@ snapshots:
   semver@7.8.4: {}
 
   set-blocking@2.0.0: {}
+
+  set-cookie-parser@3.1.0: {}
 
   set-function-length@1.2.2:
     dependencies:
@@ -4271,6 +4639,8 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
+  tagged-tag@1.0.0: {}
+
   tinybench@2.9.0: {}
 
   tinyexec@1.2.4: {}
@@ -4300,6 +4670,10 @@ snapshots:
       prelude-ls: 1.2.1
 
   type-detect@4.1.0: {}
+
+  type-fest@5.7.0:
+    dependencies:
+      tagged-tag: 1.0.0
 
   typed-array-buffer@1.0.3:
     dependencies:

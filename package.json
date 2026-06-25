@@ -95,7 +95,9 @@
   },
   "dependencies": {
     "@adyen/adyen-web": "^6.39.0",
-    "@adyen/api-library": "^22.0.0"
+    "@adyen/api-library": "^22.0.0",
+    "@convex-dev/better-auth": "^0.12.4",
+    "better-auth": "^1.6.20"
   },
   "types": "./dist/client/index.d.ts",
   "module": "./dist/client/index.js"

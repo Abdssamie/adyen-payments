@@ -1,8 +1,11 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server.js";
 import { internal } from "./_generated/api.js";
+import { authComponent, createAuth } from "./betterAuth/auth";
 
 const http = httpRouter();
+
+authComponent.registerRoutes(http, createAuth);
 
 /**
  * Register the Adyen webhook endpoint.
