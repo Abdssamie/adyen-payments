@@ -5,7 +5,7 @@ import { authComponent, createAuth } from "./betterAuth/auth";
 
 const http = httpRouter();
 
-authComponent.registerRoutes(http, createAuth);
+authComponent.registerRoutes(http, createAuth, { cors: true });
 
 /**
  * Register the Adyen webhook endpoint.
