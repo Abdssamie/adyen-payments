@@ -27,6 +27,11 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
     emailAndPassword: {
       enabled: true,
     },
+    trustedOrigins: [
+      "http://localhost:5173",
+      "https://adyen-convex.pages.dev",
+      process.env.APP_URL || "",
+    ].filter(Boolean),
     plugins: [
       convex({ authConfig }),
       crossDomain({ siteUrl: process.env.APP_URL || "http://localhost:5173" }),
