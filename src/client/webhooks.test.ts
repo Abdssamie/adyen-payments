@@ -105,6 +105,14 @@ describe("Adyen webhook processing tests", () => {
     // Verify custom handlers were triggered
     expect(onNotificationSpy).toHaveBeenCalledOnce();
     expect(customAuthorisationSpy).toHaveBeenCalledOnce();
+    expect(customAuthorisationSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventCode: "AUTHORISATION",
+        shopperReference: "user_abc",
+        isSuccess: true,
+      })
+    );
   });
 
   test("modification notifications (CAPTURE, REFUND, CANCEL)", async () => {
@@ -126,7 +134,16 @@ describe("Adyen webhook processing tests", () => {
         routes.push(r);
       },
     } as unknown as HttpRouter;
-    registerRoutes(mockHttp, components.adyenPayments);
+
+    const customCaptureSpy = vi.fn();
+    const customRefundSpy = vi.fn();
+
+    registerRoutes(mockHttp, components.adyenPayments, {
+      events: {
+        CAPTURE: customCaptureSpy,
+        REFUND: customRefundSpy,
+      },
+    });
     const handler = routes[0].handler;
 
     // 1. CAPTURE webhook
@@ -153,6 +170,15 @@ describe("Adyen webhook processing tests", () => {
       pspReference: "psp_auth_2",
     });
     expect(capturedPayment!.status).toBe("captured");
+    expect(customCaptureSpy).toHaveBeenCalledOnce();
+    expect(customCaptureSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventCode: "CAPTURE",
+        shopperReference: "user_def",
+        isSuccess: true,
+      })
+    );
 
     // 2. REFUND webhook
     const refundRequest = new Request("https://example.com/adyen/webhooks", {
@@ -178,5 +204,14 @@ describe("Adyen webhook processing tests", () => {
       pspReference: "psp_auth_2",
     });
     expect(refundedPayment!.status).toBe("refunded");
+    expect(customRefundSpy).toHaveBeenCalledOnce();
+    expect(customRefundSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        eventCode: "REFUND",
+        shopperReference: "user_def",
+        isSuccess: true,
+      })
+    );
   });
 });

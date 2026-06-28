@@ -500,6 +500,8 @@ export class AdyenPayments {
 
 export type AdyenNotificationItem = Types.notification.NotificationRequestItem & {
   shopperReference?: string;
+  metadata?: any;
+  isSuccess?: boolean;
 };
 
 export interface AdyenEventHandlers {
@@ -675,8 +677,13 @@ async function processNotification(
   const amountValue = item.amount?.value;
   const amountCurrency = item.amount?.currency;
 
+  // Enrich item with normalized success flag
+  item.isSuccess = success;
+
   let shopperReference = item.shopperReference;
   let isAutoCapture = false;
+  let metadata: any = undefined;
+
   if (merchantReference) {
     const session = await ctx.runQuery(
       component.public.getCheckoutSessionByMerchantReference,
@@ -688,6 +695,27 @@ async function processNotification(
       }
       isAutoCapture = session.autoCapture ?? false;
     }
+  }
+
+  // If shopperReference is still not resolved (common for captures, refunds, cancellations),
+  // look it up from the database using originalReference or pspReference.
+  const targetRefForLookup = originalReference || pspReference;
+  if (!shopperReference && targetRefForLookup) {
+    const payment = await ctx.runQuery(component.public.getPayment, {
+      pspReference: targetRefForLookup,
+    });
+    if (payment) {
+      shopperReference = payment.shopperReference;
+      metadata = payment.metadata;
+    }
+  }
+
+  // Enrich item with pre-resolved shopperReference and metadata
+  if (shopperReference) {
+    item.shopperReference = shopperReference;
+  }
+  if (metadata) {
+    item.metadata = metadata;
   }
 
   switch (eventCode) {

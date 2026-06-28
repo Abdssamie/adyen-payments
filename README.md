@@ -166,6 +166,13 @@ export const cancel = action({
 
 Adyen webhooks require a Node.js context because signature verification depends on Node-native packages. Define the handler inside a `"use node"` file, and map it inside your `http.ts` router.
 
+The `events` option in `createWebhookHandler` lets you register custom callback hooks. The `notification` object passed to these callbacks is automatically enriched with the following pre-resolved properties:
+* `shopperReference`: The unique shopper identifier (pre-resolved from the checkout session or previous payment records).
+* `metadata`: Custom metadata associated with the shopper/payment.
+* `isSuccess`: A pre-parsed boolean flag indicating if the event was successful (normalizing the raw string).
+
+This makes it simple to integrate payment infrastructure operations like sending receipt emails, generating invoices, or updating custom app tables right inside the callback handlers.
+
 ### 1. Webhook Handler (`convex/adyenWebhooks.ts`)
 ```ts
 "use node";
@@ -179,13 +186,19 @@ import { v } from "convex/values";
 const rawHandler = createWebhookHandler(components.adyenPayments, {
   events: {
     AUTHORISATION: async (ctx, notification) => {
-      console.log(`Payment authorized for order: ${notification.merchantReference}`);
+      if (notification.isSuccess) {
+        console.log(`Payment authorized for shopper: ${notification.shopperReference}`);
+        // Add custom code here: send emails, generate invoices, etc.
+      }
     },
     CAPTURE: async (ctx, notification) => {
-      console.log(`Payment captured: ${notification.pspReference}`);
+      if (notification.isSuccess) {
+        console.log(`Payment captured: ${notification.pspReference} for shopper ${notification.shopperReference}`);
+      }
     },
   },
 });
+
 
 export const handleWebhook = internalAction({
   args: { bodyText: v.string(), url: v.string() },
